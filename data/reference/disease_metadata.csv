@@ -1,0 +1,9 @@
+disease_name,disease_category,transmission_type,is_vaccine_preventable,vaccine_intro_year
+HEPATITIS A,Viral,Fecal-oral,true,1995
+MEASLES,Viral,Airborne,true,1963
+MUMPS,Viral,Airborne,true,1967
+PERTUSSIS,Bacterial,Airborne,true,1948
+POLIO,Viral,Fecal-oral,true,1955
+RUBELLA,Viral,Airborne,true,1969
+SMALLPOX,Viral,Contact,true,1796
+DIPHTHERIA,Bacterial,Airborne,true,1923

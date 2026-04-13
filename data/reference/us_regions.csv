@@ -1,0 +1,51 @@
+state_code,state_name,census_region,census_division,latitude,longitude
+AL,ALABAMA,South,East South Central,32.3182,-86.9023
+AK,ALASKA,West,Pacific,64.2008,-152.4937
+AZ,ARIZONA,West,Mountain,34.0489,-111.0937
+AR,ARKANSAS,South,West South Central,35.2010,-91.8318
+CA,CALIFORNIA,West,Pacific,36.7783,-119.4179
+CO,COLORADO,West,Mountain,39.5501,-105.7821
+CT,CONNECTICUT,Northeast,New England,41.6032,-73.0877
+DE,DELAWARE,South,South Atlantic,38.9108,-75.5277
+FL,FLORIDA,South,South Atlantic,27.6648,-81.5158
+GA,GEORGIA,South,South Atlantic,32.1656,-82.9001
+HI,HAWAII,West,Pacific,19.8968,-155.5828
+ID,IDAHO,West,Mountain,44.0682,-114.7420
+IL,ILLINOIS,Midwest,East North Central,40.6331,-89.3985
+IN,INDIANA,Midwest,East North Central,40.2672,-86.1349
+IA,IOWA,Midwest,West North Central,41.8780,-93.0977
+KS,KANSAS,Midwest,West North Central,39.0119,-98.4842
+KY,KENTUCKY,South,East South Central,37.8393,-84.2700
+LA,LOUISIANA,South,West South Central,30.9843,-91.9623
+ME,MAINE,Northeast,New England,45.2538,-69.4455
+MD,MARYLAND,South,South Atlantic,39.0458,-76.6413
+MA,MASSACHUSETTS,Northeast,New England,42.4072,-71.3824
+MI,MICHIGAN,Midwest,East North Central,44.3148,-85.6024
+MN,MINNESOTA,Midwest,West North Central,46.7296,-94.6859
+MS,MISSISSIPPI,South,East South Central,32.3547,-89.3985
+MO,MISSOURI,Midwest,West North Central,37.9643,-91.8318
+MT,MONTANA,West,Mountain,46.8797,-110.3626
+NE,NEBRASKA,Midwest,West North Central,41.4925,-99.9018
+NV,NEVADA,West,Mountain,38.8026,-116.4194
+NH,NEW HAMPSHIRE,Northeast,New England,43.1939,-71.5724
+NJ,NEW JERSEY,Northeast,Middle Atlantic,40.0583,-74.4057
+NM,NEW MEXICO,West,Mountain,34.5199,-105.8701
+NY,NEW YORK,Northeast,Middle Atlantic,40.7128,-74.0060
+NC,NORTH CAROLINA,South,South Atlantic,35.7596,-79.0193
+ND,NORTH DAKOTA,Midwest,West North Central,47.5515,-101.0020
+OH,OHIO,Midwest,East North Central,40.4173,-82.9071
+OK,OKLAHOMA,South,West South Central,35.4676,-97.5164
+OR,OREGON,West,Pacific,43.8041,-120.5542
+PA,PENNSYLVANIA,Northeast,Middle Atlantic,41.2033,-77.1945
+RI,RHODE ISLAND,Northeast,New England,41.5801,-71.4774
+SC,SOUTH CAROLINA,South,South Atlantic,33.8361,-81.1637
+SD,SOUTH DAKOTA,Midwest,West North Central,43.9695,-99.9018
+TN,TENNESSEE,South,East South Central,35.5175,-86.5804
+TX,TEXAS,South,West South Central,31.9686,-99.9018
+UT,UTAH,West,Mountain,39.3210,-111.0937
+VT,VERMONT,Northeast,New England,44.5588,-72.5778
+VA,VIRGINIA,South,South Atlantic,37.4316,-78.6569
+WA,WASHINGTON,West,Pacific,47.7511,-120.7401
+WV,WEST VIRGINIA,South,South Atlantic,38.5976,-80.4549
+WI,WISCONSIN,Midwest,East North Central,43.7844,-88.7879
+WY,WYOMING,West,Mountain,43.0760,-107.2903
