@@ -28,7 +28,7 @@ export default function Home() {
       getMetadata('postgres').catch(() => null),
       getMetadata('mongodb').catch(() => null),
       getMetadata('neo4j').catch(() => null),
-      executeQuery('Q1', 'postgres').catch(() => null),
+      executeQuery('Q1', 'mongodb').catch(() => null),
     ]).then(([h, pg, mongo, neo4j, q1]) => {
       setHealth(h);
       setPgMeta(pg);
@@ -67,7 +67,7 @@ export default function Home() {
         <StatCard label="PostgreSQL Rows" value={pgRows.toLocaleString()} sub={pgMeta?.database_size} />
         <StatCard label="MongoDB Documents" value={mongoDocs.toLocaleString()} sub={`${mongoMeta?.collections?.length || 0} collections`} />
         <StatCard label="Neo4j Nodes" value={neo4jNodes.toLocaleString()} sub={`${neo4jMeta?.node_labels?.length || 0} labels`} />
-        <StatCard label="Diseases Tracked" value="8" sub="1930-2010" />
+        <StatCard label="Diseases Tracked" value="8" sub="1916-2011" />
       </div>
 
       {health && (
