@@ -270,7 +270,7 @@ class MongoService:
     # Q8: Vaccination impact — before/after comparison
     # ------------------------------------------------------------------
     def q8(self, **kwargs) -> tuple[list[dict], float, str]:
-        # Get disease metadata
+        start = time.time()
         diseases = list(self.db.disease_observations.aggregate([
             {"$group": {"_id": {
                 "name": "$disease.name",
@@ -330,8 +330,8 @@ class MongoService:
 
         results.sort(key=lambda x: x["pct_change"])
         pipeline_text = "Multiple aggregations per disease (pre/post vaccine comparison)"
-        start = time.time()
-        return results, 0.0, pipeline_text
+        elapsed_ms = round((time.time() - start) * 1000, 2)
+        return results, elapsed_ms, pipeline_text
 
     # ------------------------------------------------------------------
     # Q9: Anomaly detection — states > 2 std dev above national mean

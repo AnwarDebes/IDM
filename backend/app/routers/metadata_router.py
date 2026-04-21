@@ -106,6 +106,34 @@ def neo4j_metadata():
     """Return Neo4j schema metadata: node labels, relationship types, counts."""
     try:
         with _neo4j.driver.session() as session:
+            db_size_bytes = None
+            db_size_source = None
+            try:
+                row = session.run(
+                    "CALL apoc.monitor.store() YIELD logSize, stringStoreSize, arrayStoreSize, "
+                    "relStoreSize, propStoreSize, totalStoreSize, nodeStoreSize "
+                    "RETURN totalStoreSize AS total"
+                ).single()
+                if row and row["total"] is not None:
+                    db_size_bytes = int(row["total"])
+                    db_size_source = "apoc.monitor.store"
+            except Exception:
+                pass
+            if db_size_bytes is None:
+                try:
+                    total = 0
+                    for r in session.run("CALL dbms.queryJmx('org.neo4j:*')"):
+                        attrs = r.get("attributes") or {}
+                        for key in ("TotalStoreSize", "StoreSize"):
+                            val = attrs.get(key, {}).get("value")
+                            if isinstance(val, (int, float)) and val > total:
+                                total = int(val)
+                    if total > 0:
+                        db_size_bytes = total
+                        db_size_source = "dbms.queryJmx"
+                except Exception:
+                    pass
+
             # Node counts by label
             result = session.run("""
                 CALL db.labels() YIELD label
@@ -134,6 +162,8 @@ def neo4j_metadata():
 
         return {
             "backend": "neo4j",
+            "database_size_bytes": db_size_bytes,
+            "database_size_source": db_size_source,
             "node_labels": nodes,
             "relationship_types": rels,
             "constraints": constraints,

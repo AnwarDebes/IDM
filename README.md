@@ -1,6 +1,6 @@
 # Epidemiological Data Warehouse & Analytics Platform
 
-A multi-backend data warehouse for epidemiological surveillance analytics built on Project Tycho disease incidence data. The system consolidates weekly disease reports across **three database backends** -- PostgreSQL (relational star schema), MongoDB (document-oriented bucket pattern), and Neo4j (graph model) -- unified behind a single **FastAPI** REST layer with a **React** analytics dashboard. Data ingestion is powered by **Apache Kafka** with **kSQL** stream processing for real-time event transformation and anomaly detection.
+A multi-backend data warehouse for epidemiological surveillance analytics built on real Project Tycho Level 1 disease incidence data (1916 to 2011, 8 diseases, 51 state-level and 120 city-level jurisdictions, 473{,}189 cleaned weekly observations). The system consolidates weekly disease reports across **three database backends** (PostgreSQL with a relational star schema, MongoDB with the document bucket pattern, and Neo4j with a labeled property graph) unified behind a single **FastAPI** REST layer with a **React** analytics dashboard. Data ingestion is powered by **Apache Kafka** running in KRaft mode (Confluent Platform 8.2) with **ksqlDB** for stream validation, windowed aggregation, and anomaly alerting. A controlled synthetic generator is retained for benchmarking and reproducibility.
 
 ---
 
@@ -66,9 +66,12 @@ The platform follows a layered architecture with clear separation between data i
                     +-------------------+--------------------+
                                         |
                     +-------------------v--------------------+
-                    |          Synthetic Data Generator       |
-                    |  ~1.1M rows, 8 diseases, 50 states     |
-                    |  1930-2010, weekly granularity          |
+                    |    Data Sources (real + synthetic)      |
+                    |  Real: Project Tycho Level 1            |
+                    |   473,189 clean rows (1916-2011),       |
+                    |   8 diseases, 51 jurisdictions +        |
+                    |   120 cities, weekly granularity        |
+                    |  Synthetic generator for benchmarking   |
                     +----------------------------------------+
 ```
 
@@ -76,12 +79,12 @@ The platform follows a layered architecture with clear separation between data i
 
 | Service | Container | Port | Purpose |
 |---------|-----------|------|---------|
-| PostgreSQL 16 | `epid-postgres` | 15432 | Star schema relational DW |
-| MongoDB 7 | `epid-mongodb` | 27017 | Document-based DW (bucket pattern) |
-| Neo4j 5 | `epid-neo4j` | 7474 / 7687 | Graph-based DW with APOC |
-| Kafka (KRaft) | `epid-kafka` | 9092 | Event streaming broker |
-| kSQL Server | `epid-ksqldb-server` | 8088 | Stream processing engine |
-| kSQL CLI | `epid-ksqldb-cli` | -- | Interactive kSQL client |
+| PostgreSQL 18 | `epid-postgres` | 15432 | Star schema relational DW |
+| MongoDB 8.0 | `epid-mongodb` | 27017 | Document-based DW (bucket pattern) |
+| Neo4j 2026.03 | `epid-neo4j` | 7474 / 7687 | Graph-based DW with APOC |
+| Kafka (KRaft, Confluent 8.2) | `epid-kafka` | 9092 | Event streaming broker |
+| ksqlDB Server (Confluent 8.2) | `epid-ksqldb-server` | 8088 | Stream processing engine |
+| ksqlDB CLI (Confluent 8.2) | `epid-ksqldb-cli` | (none) | Interactive kSQL client |
 | FastAPI | `epid-backend` | 8000 | Unified REST API |
 | React | `epid-frontend` | 3000 | Analytics dashboard |
 
@@ -93,15 +96,15 @@ All services run on a shared Docker bridge network (`dw-network`) with health ch
 
 ### Source Data
 
-The dataset is modeled on **Project Tycho Level 1** disease surveillance data from the University of Pittsburgh. A synthetic data generator produces realistic epidemiological patterns:
+The primary dataset is **Project Tycho Level 1** disease surveillance data from the University of Pittsburgh, downloaded directly from the Tycho data portal. A controlled synthetic data generator is retained alongside it for benchmarking and reproducibility.
 
-| Attribute | Value |
-|-----------|-------|
-| **Diseases** | 8 (Measles, Pertussis, Polio, Diphtheria, Hepatitis A, Mumps, Rubella, Smallpox) |
-| **Geographic Coverage** | 50 US states |
-| **Time Range** | 1930 -- 2010 (81 years) |
-| **Granularity** | Weekly (epidemiological weeks) |
-| **Total Records** | ~1,109,360 fact rows |
+| Attribute | Real Project Tycho Level 1 | Synthetic Benchmark |
+|-----------|----------------------------|---------------------|
+| **Diseases** | 8 (Measles, Pertussis, Polio, Diphtheria, Hepatitis A, Mumps, Rubella, Smallpox) | Same 8 diseases |
+| **Geographic Coverage** | 51 jurisdictions (50 states + District of Columbia) plus 120 city-grain (state, city) reporting locations | 51 jurisdictions |
+| **Time Range** | 1916 to 2011 (96 years) | 1910 to 2010 (101 years) |
+| **Granularity** | Weekly (epidemiological weeks) | Weekly (epidemiological weeks) |
+| **Total Records** | 759,467 raw rows, 473,189 cleaned fact rows | ~1,109,360 fact rows |
 
 ### Disease Reference Data
 
@@ -120,17 +123,13 @@ The dataset is modeled on **Project Tycho Level 1** disease surveillance data fr
 +---------------+------------+---------------+---------------------+--------------+
 ```
 
-The data generator produces realistic patterns including:
-- **Pre/post-vaccine exponential decline** (e.g., Measles drops sharply after 1963)
-- **Seasonal modulation** using sinusoidal cycles (respiratory diseases peak in winter)
-- **Population-proportional geographic variation** based on US Census data
-- **Poisson-distributed random noise** for statistical realism
+The real Project Tycho Level 1 feed exposes genuine epidemiological patterns such as sharp post-vaccine decline for MEASLES (1963), POLIO (1955), and RUBELLA (1969), as well as real reporting-era boundaries (HEPATITIS A begins in 1966, MUMPS in 1968, RUBELLA in 1966, and PERTUSSIS has a genuine 1956 to 1973 reporting gap in the Level 1 archive). The synthetic generator, used only for benchmarking, reproduces these behaviours through pre and post vaccine exponential decline, sinusoidal seasonal modulation with respiratory diseases peaking in winter, population-proportional geographic variation based on US Census data, and Poisson-distributed random noise for statistical realism.
 
 ---
 
 ## Database Backend Designs
 
-### 1. PostgreSQL -- Star Schema (Relational / ROLAP)
+### 1. PostgreSQL (Star Schema, Relational / ROLAP)
 
 The relational backend implements a classic **Kimball-style star schema** optimized for OLAP slice, dice, drill-down, roll-up, and pivot operations.
 
@@ -166,17 +165,18 @@ The relational backend implements a classic **Kimball-style star schema** optimi
 
 **Pre-aggregated materialized views** for common query patterns:
 
-| Materialized View | Granularity | Purpose |
-|-------------------|-------------|---------|
-| `mv_monthly_disease_state` | Monthly | Disease cases by state per month |
-| `mv_yearly_disease_region` | Yearly | Disease cases by region per year with peak tracking |
-| `mv_decade_disease_national` | Decade | National totals by disease per decade |
+| Materialized View | Granularity | Rows (real Tycho load) | Purpose |
+|-------------------|-------------|-----------------------|---------|
+| `mv_monthly_disease_state` | Monthly | 126,113 | Disease cases by state per month |
+| `mv_yearly_disease_region` | Yearly | 1,253 | Disease cases by region per year with peak tracking |
+| `mv_decade_disease_national` | Decade | 46 | National totals by disease per decade |
+| `mv_yearly_disease_city` | Yearly | 3,301 | City-grain yearly totals (DIPHTHERIA 1916 to 1947 etc.) |
 
 **Indexes:** Composite index on `(disease_key, time_key, location_key)` plus individual FK indexes for flexible star-join performance.
 
 ---
 
-### 2. MongoDB -- Bucket Pattern (Document / DOLAP)
+### 2. MongoDB (Bucket Pattern, Document / DOLAP)
 
 The document backend uses the **Bucket Pattern** to group weekly observations into monthly documents, reducing document count while preserving granular access.
 
@@ -221,17 +221,17 @@ The document backend uses the **Bucket Pattern** to group weekly observations in
 
 **Collections:**
 
-| Collection | Documents | Purpose |
-|------------|-----------|---------|
-| `disease_observations` | ~153K | Primary bucket documents (disease + state + month) |
-| `summary_monthly_by_region` | Pre-agg | Regional monthly summaries |
-| `summary_decade_national` | Pre-agg | National decade-level totals |
+| Collection | Documents (real Tycho load) | Purpose |
+|------------|-----------------------------|---------|
+| `disease_observations` | 155,063 buckets (avg 3.05 weekly observations per bucket) | Primary bucket documents (disease + location + month) |
+| `summary_monthly_by_region` | 14,157 | Regional monthly summaries |
+| `summary_decade_national` | 46 | National decade-level totals |
 
-**Indexes:** Compound indexes on `(disease.name, time_bucket.year, location.state_code)` and `(location.region, time_bucket.decade)` for efficient aggregation pipeline filtering.
+**Indexes:** Compound indexes on `(disease.name, time_bucket.year, location.state_code)` and `(location.region, time_bucket.decade)`, plus `(location.loc_type, location.loc)` to separate STATE-grain and CITY-grain documents in the same collection.
 
 ---
 
-### 3. Neo4j -- Graph Model (GOLAP)
+### 3. Neo4j (Graph Model, GOLAP)
 
 The graph backend models the data as a network of interconnected nodes, enabling relationship-based queries impossible in relational or document stores.
 
@@ -265,27 +265,29 @@ The graph backend models the data as a network of interconnected nodes, enabling
 
 **Node Types:**
 
-| Label | Count | Key Properties |
-|-------|-------|----------------|
+| Label | Count (real Tycho load) | Key Properties |
+|-------|-------------------------|----------------|
 | `Disease` | 8 | name, category, transmission, vaccine_year |
-| `State` | 50 | code, name, division, lat/lng |
+| `State` | 51 | code, name, division, lat/lng |
+| `City` | 120 | city_name, state_code, loc_type |
 | `Region` | 4 | name |
-| `Observation` | ~1.1M | case_count, incidence_rate |
-| `MonthlyAggregate` | ~153K | total_cases, avg_incidence, observation_count |
-| `Week` | ~4,200 | epi_week, week_number, year, month |
-| `Month` | ~960 | year, month, month_name |
-| `Year` | 81 | year |
-| `Decade` | 9 | decade |
+| `Observation` | 473,189 | case_count, incidence_rate |
+| `MonthlyAggregate` | 155,063 | total_cases, avg_incidence, observation_count |
+| `Week` | 4,947 | epi_week, week_number, year, month |
+| `Month` | 1,152 | year, month, month_name |
+| `Year` | 96 | year |
+| `Decade` | 11 | decade |
 
 **Key Relationships:**
 
 | Relationship | Description |
 |-------------|-------------|
 | `BORDERS` | State adjacency (for geographic spread analysis) |
-| `IN_REGION` | State -> Region hierarchy |
-| `SUMMARIZES_DISEASE/STATE/MONTH` | MonthlyAggregate -> dimensions |
-| `AFFECTS / OBSERVED_IN / OBSERVED_AT` | Observation -> Disease/State/Week |
-| `IN_MONTH -> IN_QUARTER -> IN_YEAR -> IN_DECADE` | Time hierarchy chain |
+| `IN_REGION` | State to Region hierarchy |
+| `LOCATED_IN_STATE` | City to State hierarchy (city-grain Tycho rows) |
+| `SUMMARIZES_DISEASE` / `SUMMARIZES_STATE` / `SUMMARIZES_MONTH` | MonthlyAggregate to dimensions |
+| `AFFECTS` / `OBSERVED_IN` / `OBSERVED_AT` | Observation to Disease / State / Week |
+| `IN_MONTH`, `IN_QUARTER`, `IN_YEAR`, `IN_DECADE` | Time hierarchy chain |
 
 ---
 
@@ -294,7 +296,7 @@ The graph backend models the data as a network of interconnected nodes, enabling
 The ETL pipeline runs in three stages. Each loader script reads the cleaned CSV and builds backend-specific data structures.
 
 ```
-  data/raw/tycho_level1.csv
+  data/raw/tycho_level1_real.csv  (or tycho_level1_synth.csv via TYCHO_DATA_FILE)
             |
      +------v-------+
      |   extract.py  |  Read CSV + reference data (regions, diseases, borders, populations)
@@ -320,9 +322,10 @@ The ETL pipeline runs in three stages. Each loader script reads the cleaned CSV 
 
 | Stage | Script | Input | Output |
 |-------|--------|-------|--------|
-| **Generate** | `generate_synthetic_data.py` | Disease parameters, Census populations | `tycho_level1.csv` (~42 MB, 1.1M rows) |
+| **Fetch real data** | `fetch_tycho.py` | Project Tycho Level 1 portal | `tycho_level1_real.csv` (759,467 raw rows) |
+| **Generate synthetic** | `generate_synthetic_data.py` | Disease parameters, Census populations | `tycho_level1_synth.csv` (~42 MB, 1.1M rows) |
 | **Validate** | `validate_data.py` | Raw CSV + reference files | Quality report (column checks, range validation, data quality %) |
-| **Extract** | `extract.py` | CSV files | Pandas DataFrames |
+| **Extract** | `extract.py` | CSV file selected by `TYCHO_DATA_FILE` env var | Pandas DataFrames |
 | **Transform** | `transform.py` | Raw DataFrames | Dimensions, fact table, Mongo docs, Neo4j nodes/rels |
 | **Load PG** | `load_postgres.py` | Cleaned data | Dimensions + fact table via COPY + materialized view refresh |
 | **Load Mongo** | `load_mongo.py` | Cleaned data | Bucket documents + pre-aggregated summary collections |
@@ -369,9 +372,9 @@ Real-time data ingestion uses Apache Kafka (KRaft mode, no ZooKeeper) with kSQL 
 
 ## Decision Support Queries
 
-The platform implements **13 decision support queries** -- 10 that run across all three backends (for performance comparison) and 3 graph-exclusive queries that leverage Neo4j's relationship traversal.
+The platform implements **13 decision support queries** (10 that run across all three backends for performance comparison, plus 3 graph-exclusive queries that leverage Neo4j's relationship traversal).
 
-### Cross-Backend Queries (Q1--Q10)
+### Cross-Backend Queries (Q1 to Q10)
 
 | ID | Query | OLAP Operation | Description |
 |----|-------|---------------|-------------|
@@ -386,7 +389,7 @@ The platform implements **13 decision support queries** -- 10 that run across al
 | **Q9** | Anomaly detection | Statistical | Find state-years > 2 standard deviations above national mean |
 | **Q10** | Normalized trends | Pivot + Norm | Each disease's annual cases as % of its historical peak |
 
-### Graph-Exclusive Queries (Q11--Q13)
+### Graph-Exclusive Queries (Q11 to Q13)
 
 | ID | Query | OLAP Operation | Description |
 |----|-------|---------------|-------------|
@@ -399,9 +402,9 @@ The platform implements **13 decision support queries** -- 10 that run across al
 Each query is implemented natively in all supported backends:
 
 ```
-PostgreSQL  -->  SQL with JOINs, CTEs, window functions (LAG, RANK), LATERAL joins
-MongoDB     -->  Aggregation pipelines with $group, $unwind, $setWindowFields, $lookup
-Neo4j       -->  Cypher with MATCH patterns, UNWIND, COLLECT, CALL subqueries
+PostgreSQL:  SQL with JOINs, CTEs, window functions (LAG, RANK), LATERAL joins
+MongoDB:     Aggregation pipelines with $group, $unwind, $setWindowFields, $lookup
+Neo4j:       Cypher with MATCH patterns, UNWIND, COLLECT, CALL subqueries
 ```
 
 The `/compare` endpoint runs the same logical query on all three backends concurrently (using a thread pool) and returns execution times for direct performance comparison.
@@ -658,8 +661,8 @@ epidemiological-dw/
 |   +-- raw/                        # Generated CSV (excluded from git)
 |   +-- reference/                  # Static reference data
 |       +-- disease_metadata.csv    # 8 diseases with categories and vaccine years
-|       +-- us_regions.csv          # 50 states with regions, divisions, coordinates
-|       +-- state_populations.csv   # State populations by decade (1930-2010)
+|       +-- us_regions.csv          # 51 jurisdictions (50 states + DC) with regions, divisions, coordinates
+|       +-- state_populations.csv   # Jurisdiction populations by decade (1910-2010)
 |       +-- state_borders.csv       # State adjacency for graph queries
 |
 +-- docker-compose.yml              # Full service orchestration
