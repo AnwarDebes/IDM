@@ -4,6 +4,8 @@
 # Data files
 data/raw/*.csv
 data/processed/
+backend/ProjectTycho_Level1_v.1.0.0/
+__MACOSX/
 
 # Python
 __pycache__/

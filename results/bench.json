@@ -1,0 +1,1465 @@
+{
+  "config": {
+    "N": 7,
+    "warmup": 2,
+    "api": "http://localhost:8000"
+  },
+  "cross_backend": {
+    "Q1": {
+      "postgres": {
+        "median_ms": 250.75,
+        "p25_ms": 222.07,
+        "p75_ms": 267.86,
+        "runs": [
+          178.89,
+          160.89,
+          168.68,
+          250.75,
+          267.86,
+          222.07,
+          331.16
+        ],
+        "kept": [
+          168.68,
+          250.75,
+          267.86,
+          222.07,
+          331.16
+        ],
+        "row_count": 42,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 147.69,
+        "p25_ms": 140.44,
+        "p75_ms": 160.05,
+        "runs": [
+          217.92,
+          176.1,
+          161.06,
+          147.69,
+          140.44,
+          160.05,
+          138.8
+        ],
+        "kept": [
+          161.06,
+          147.69,
+          140.44,
+          160.05,
+          138.8
+        ],
+        "row_count": 46,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 527.18,
+        "p25_ms": 451.34,
+        "p75_ms": 568.17,
+        "runs": [
+          369.49,
+          369.31,
+          375.45,
+          451.34,
+          568.17,
+          755.57,
+          527.18
+        ],
+        "kept": [
+          375.45,
+          451.34,
+          568.17,
+          755.57,
+          527.18
+        ],
+        "row_count": 46,
+        "error": null
+      }
+    },
+    "Q2": {
+      "postgres": {
+        "median_ms": 17.79,
+        "p25_ms": 17.49,
+        "p75_ms": 18.01,
+        "runs": [
+          17.76,
+          26.42,
+          22.72,
+          18.01,
+          17.49,
+          17.25,
+          17.79
+        ],
+        "kept": [
+          22.72,
+          18.01,
+          17.49,
+          17.25,
+          17.79
+        ],
+        "row_count": 50,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 5.63,
+        "p25_ms": 5.36,
+        "p75_ms": 5.81,
+        "runs": [
+          10.73,
+          4.7,
+          4.35,
+          5.81,
+          6.95,
+          5.63,
+          5.36
+        ],
+        "kept": [
+          4.35,
+          5.81,
+          6.95,
+          5.63,
+          5.36
+        ],
+        "row_count": 50,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 11.38,
+        "p25_ms": 11.0,
+        "p75_ms": 13.95,
+        "runs": [
+          12.57,
+          12.22,
+          15.7,
+          11.0,
+          11.38,
+          13.95,
+          10.97
+        ],
+        "kept": [
+          15.7,
+          11.0,
+          11.38,
+          13.95,
+          10.97
+        ],
+        "row_count": 50,
+        "error": null
+      }
+    },
+    "Q3": {
+      "postgres": {
+        "median_ms": 54.61,
+        "p25_ms": 53.64,
+        "p75_ms": 55.64,
+        "runs": [
+          55.89,
+          81.6,
+          54.61,
+          53.64,
+          50.09,
+          55.91,
+          55.64
+        ],
+        "kept": [
+          54.61,
+          53.64,
+          50.09,
+          55.91,
+          55.64
+        ],
+        "row_count": 10,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 21.92,
+        "p25_ms": 21.5,
+        "p75_ms": 23.73,
+        "runs": [
+          30.46,
+          23.39,
+          21.5,
+          20.98,
+          29.53,
+          23.73,
+          21.92
+        ],
+        "kept": [
+          21.5,
+          20.98,
+          29.53,
+          23.73,
+          21.92
+        ],
+        "row_count": 10,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 117.92,
+        "p25_ms": 90.32,
+        "p75_ms": 130.09,
+        "runs": [
+          400.51,
+          107.66,
+          85.21,
+          90.32,
+          117.92,
+          135.85,
+          130.09
+        ],
+        "kept": [
+          85.21,
+          90.32,
+          117.92,
+          135.85,
+          130.09
+        ],
+        "row_count": 10,
+        "error": null
+      }
+    },
+    "Q4": {
+      "postgres": {
+        "median_ms": 86.16,
+        "p25_ms": 83.64,
+        "p75_ms": 88.75,
+        "runs": [
+          151.42,
+          116.87,
+          88.75,
+          83.64,
+          86.16,
+          82.59,
+          100.92
+        ],
+        "kept": [
+          88.75,
+          83.64,
+          86.16,
+          82.59,
+          100.92
+        ],
+        "row_count": 12,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 242.91,
+        "p25_ms": 233.76,
+        "p75_ms": 243.28,
+        "runs": [
+          281.06,
+          279.13,
+          242.91,
+          243.28,
+          247.84,
+          233.76,
+          230.92
+        ],
+        "kept": [
+          242.91,
+          243.28,
+          247.84,
+          233.76,
+          230.92
+        ],
+        "row_count": 12,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 103.39,
+        "p25_ms": 100.52,
+        "p75_ms": 104.72,
+        "runs": [
+          256.96,
+          107.17,
+          104.72,
+          103.39,
+          108.37,
+          100.13,
+          100.52
+        ],
+        "kept": [
+          104.72,
+          103.39,
+          108.37,
+          100.13,
+          100.52
+        ],
+        "row_count": 12,
+        "error": null
+      }
+    },
+    "Q5": {
+      "postgres": {
+        "median_ms": 171.34,
+        "p25_ms": 129.56,
+        "p75_ms": 172.94,
+        "runs": [
+          105.65,
+          110.99,
+          118.6,
+          129.56,
+          178.11,
+          172.94,
+          171.34
+        ],
+        "kept": [
+          118.6,
+          129.56,
+          178.11,
+          172.94,
+          171.34
+        ],
+        "row_count": 3257,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 126.51,
+        "p25_ms": 105.66,
+        "p75_ms": 144.36,
+        "runs": [
+          157.93,
+          156.02,
+          150.48,
+          144.36,
+          105.66,
+          126.51,
+          103.41
+        ],
+        "kept": [
+          150.48,
+          144.36,
+          105.66,
+          126.51,
+          103.41
+        ],
+        "row_count": 3257,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 417.15,
+        "p25_ms": 381.12,
+        "p75_ms": 459.03,
+        "runs": [
+          980.47,
+          623.11,
+          459.03,
+          632.07,
+          417.15,
+          373.84,
+          381.12
+        ],
+        "kept": [
+          459.03,
+          632.07,
+          417.15,
+          373.84,
+          381.12
+        ],
+        "row_count": 3206,
+        "error": null
+      }
+    },
+    "Q6": {
+      "postgres": {
+        "median_ms": 328.51,
+        "p25_ms": 314.4,
+        "p75_ms": 334.33,
+        "runs": [
+          430.31,
+          473.1,
+          314.4,
+          302.66,
+          328.51,
+          352.9,
+          334.33
+        ],
+        "kept": [
+          314.4,
+          302.66,
+          328.51,
+          352.9,
+          334.33
+        ],
+        "row_count": 15,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 270.74,
+        "p25_ms": 252.13,
+        "p75_ms": 345.88,
+        "runs": [
+          304.66,
+          333.26,
+          437.74,
+          345.88,
+          270.74,
+          252.13,
+          229.99
+        ],
+        "kept": [
+          437.74,
+          345.88,
+          270.74,
+          252.13,
+          229.99
+        ],
+        "row_count": 8,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 641.65,
+        "p25_ms": 620.23,
+        "p75_ms": 661.78,
+        "runs": [
+          765.73,
+          713.79,
+          620.23,
+          641.65,
+          837.94,
+          553.6,
+          661.78
+        ],
+        "kept": [
+          620.23,
+          641.65,
+          837.94,
+          553.6,
+          661.78
+        ],
+        "row_count": 19,
+        "error": null
+      }
+    },
+    "Q7": {
+      "postgres": {
+        "median_ms": 118.0,
+        "p25_ms": 111.8,
+        "p75_ms": 120.43,
+        "runs": [
+          124.62,
+          144.31,
+          152.04,
+          118.0,
+          110.81,
+          111.8,
+          120.43
+        ],
+        "kept": [
+          152.04,
+          118.0,
+          110.81,
+          111.8,
+          120.43
+        ],
+        "row_count": 51,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 94.76,
+        "p25_ms": 85.37,
+        "p75_ms": 99.15,
+        "runs": [
+          90.64,
+          103.86,
+          85.37,
+          99.15,
+          107.05,
+          94.76,
+          79.84
+        ],
+        "kept": [
+          85.37,
+          99.15,
+          107.05,
+          94.76,
+          79.84
+        ],
+        "row_count": 51,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 206.02,
+        "p25_ms": 172.72,
+        "p75_ms": 212.84,
+        "runs": [
+          1082.76,
+          320.61,
+          223.34,
+          206.02,
+          212.84,
+          170.72,
+          172.72
+        ],
+        "kept": [
+          223.34,
+          206.02,
+          212.84,
+          170.72,
+          172.72
+        ],
+        "row_count": 51,
+        "error": null
+      }
+    },
+    "Q8": {
+      "postgres": {
+        "median_ms": 147.18,
+        "p25_ms": 141.03,
+        "p75_ms": 149.7,
+        "runs": [
+          152.06,
+          138.51,
+          147.18,
+          133.48,
+          141.03,
+          168.76,
+          149.7
+        ],
+        "kept": [
+          147.18,
+          133.48,
+          141.03,
+          168.76,
+          149.7
+        ],
+        "row_count": 8,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 200.72,
+        "p25_ms": 190.17,
+        "p75_ms": 207.98,
+        "runs": [
+          217.56,
+          213.86,
+          190.17,
+          207.98,
+          187.12,
+          200.72,
+          222.95
+        ],
+        "kept": [
+          190.17,
+          207.98,
+          187.12,
+          200.72,
+          222.95
+        ],
+        "row_count": 7,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 428.91,
+        "p25_ms": 411.74,
+        "p75_ms": 555.26,
+        "runs": [
+          397.17,
+          368.61,
+          703.2,
+          555.26,
+          411.74,
+          428.91,
+          409.71
+        ],
+        "kept": [
+          703.2,
+          555.26,
+          411.74,
+          428.91,
+          409.71
+        ],
+        "row_count": 7,
+        "error": null
+      }
+    },
+    "Q9": {
+      "postgres": {
+        "median_ms": 575.59,
+        "p25_ms": 523.86,
+        "p75_ms": 582.18,
+        "runs": [
+          496.18,
+          484.33,
+          462.87,
+          575.59,
+          523.86,
+          771.87,
+          582.18
+        ],
+        "kept": [
+          462.87,
+          575.59,
+          523.86,
+          771.87,
+          582.18
+        ],
+        "row_count": 50,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 298.41,
+        "p25_ms": 263.33,
+        "p75_ms": 302.67,
+        "runs": [
+          249.19,
+          261.01,
+          304.18,
+          263.33,
+          240.31,
+          298.41,
+          302.67
+        ],
+        "kept": [
+          304.18,
+          263.33,
+          240.31,
+          298.41,
+          302.67
+        ],
+        "row_count": 50,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 1132.68,
+        "p25_ms": 770.93,
+        "p75_ms": 1487.55,
+        "runs": [
+          492.32,
+          504.88,
+          668.71,
+          1487.55,
+          1608.36,
+          1132.68,
+          770.93
+        ],
+        "kept": [
+          668.71,
+          1487.55,
+          1608.36,
+          1132.68,
+          770.93
+        ],
+        "row_count": 50,
+        "error": null
+      }
+    },
+    "Q10": {
+      "postgres": {
+        "median_ms": 266.13,
+        "p25_ms": 215.68,
+        "p75_ms": 323.77,
+        "runs": [
+          176.09,
+          283.09,
+          340.01,
+          323.77,
+          266.13,
+          215.68,
+          206.62
+        ],
+        "kept": [
+          340.01,
+          323.77,
+          266.13,
+          215.68,
+          206.62
+        ],
+        "row_count": 315,
+        "error": null
+      },
+      "mongodb": {
+        "median_ms": 178.15,
+        "p25_ms": 174.13,
+        "p75_ms": 206.08,
+        "runs": [
+          199.54,
+          164.64,
+          206.59,
+          174.13,
+          206.08,
+          178.15,
+          156.4
+        ],
+        "kept": [
+          206.59,
+          174.13,
+          206.08,
+          178.15,
+          156.4
+        ],
+        "row_count": 347,
+        "error": null
+      },
+      "neo4j": {
+        "median_ms": 385.21,
+        "p25_ms": 343.78,
+        "p75_ms": 436.97,
+        "runs": [
+          1033.96,
+          705.08,
+          436.97,
+          385.21,
+          343.78,
+          319.98,
+          492.82
+        ],
+        "kept": [
+          436.97,
+          385.21,
+          343.78,
+          319.98,
+          492.82
+        ],
+        "row_count": 347,
+        "error": null
+      }
+    }
+  },
+  "graph_only": {
+    "Q11": {
+      "median_ms": 19811.04,
+      "p25_ms": 18852.43,
+      "p75_ms": 23467.26,
+      "runs": [
+        21822.1,
+        19397.07,
+        27392.27,
+        23467.26,
+        19811.04,
+        18852.43,
+        17952.32
+      ],
+      "kept": [
+        27392.27,
+        23467.26,
+        19811.04,
+        18852.43,
+        17952.32
+      ],
+      "row_count": 50,
+      "error": null
+    },
+    "Q12": {
+      "median_ms": 252.28,
+      "p25_ms": 250.49,
+      "p75_ms": 259.54,
+      "runs": [
+        569.48,
+        295.04,
+        250.49,
+        265.32,
+        252.28,
+        247.15,
+        259.54
+      ],
+      "kept": [
+        250.49,
+        265.32,
+        252.28,
+        247.15,
+        259.54
+      ],
+      "row_count": 51,
+      "error": null
+    },
+    "Q13": {
+      "median_ms": 165.31,
+      "p25_ms": 159.2,
+      "p75_ms": 171.38,
+      "runs": [
+        440.23,
+        174.3,
+        165.31,
+        159.2,
+        171.38,
+        155.7,
+        180.58
+      ],
+      "kept": [
+        165.31,
+        159.2,
+        171.38,
+        155.7,
+        180.58
+      ],
+      "row_count": 8,
+      "error": null
+    }
+  },
+  "sizes": {
+    "postgres": {
+      "backend": "postgres",
+      "database_size": "92 MB",
+      "tables": [
+        {
+          "table_name": "fact_disease_incidence",
+          "estimated_row_count": 473189
+        },
+        {
+          "table_name": "dim_time",
+          "estimated_row_count": 4947
+        },
+        {
+          "table_name": "dim_location",
+          "estimated_row_count": 171
+        },
+        {
+          "table_name": "dim_disease",
+          "estimated_row_count": 8
+        }
+      ],
+      "materialized_views": [
+        {
+          "view_name": "mv_decade_disease_national",
+          "estimated_row_count": 46
+        },
+        {
+          "view_name": "mv_monthly_disease_state",
+          "estimated_row_count": 126113
+        },
+        {
+          "view_name": "mv_yearly_disease_city",
+          "estimated_row_count": 3301
+        },
+        {
+          "view_name": "mv_yearly_disease_region",
+          "estimated_row_count": 1253
+        }
+      ],
+      "indexes": [
+        {
+          "indexname": "dim_disease_disease_name_key",
+          "tablename": "dim_disease",
+          "indexdef": "CREATE UNIQUE INDEX dim_disease_disease_name_key ON public.dim_disease USING btree (disease_name)"
+        },
+        {
+          "indexname": "dim_disease_pkey",
+          "tablename": "dim_disease",
+          "indexdef": "CREATE UNIQUE INDEX dim_disease_pkey ON public.dim_disease USING btree (disease_key)"
+        },
+        {
+          "indexname": "dim_location_city_name_state_code_loc_type_key",
+          "tablename": "dim_location",
+          "indexdef": "CREATE UNIQUE INDEX dim_location_city_name_state_code_loc_type_key ON public.dim_location USING btree (city_name, state_code, loc_type)"
+        },
+        {
+          "indexname": "dim_location_pkey",
+          "tablename": "dim_location",
+          "indexdef": "CREATE UNIQUE INDEX dim_location_pkey ON public.dim_location USING btree (location_key)"
+        },
+        {
+          "indexname": "dim_time_epi_week_key",
+          "tablename": "dim_time",
+          "indexdef": "CREATE UNIQUE INDEX dim_time_epi_week_key ON public.dim_time USING btree (epi_week)"
+        },
+        {
+          "indexname": "dim_time_pkey",
+          "tablename": "dim_time",
+          "indexdef": "CREATE UNIQUE INDEX dim_time_pkey ON public.dim_time USING btree (time_key)"
+        },
+        {
+          "indexname": "fact_disease_incidence_pkey",
+          "tablename": "fact_disease_incidence",
+          "indexdef": "CREATE UNIQUE INDEX fact_disease_incidence_pkey ON public.fact_disease_incidence USING btree (incidence_key)"
+        },
+        {
+          "indexname": "idx_fact_composite",
+          "tablename": "fact_disease_incidence",
+          "indexdef": "CREATE INDEX idx_fact_composite ON public.fact_disease_incidence USING btree (disease_key, time_key, location_key)"
+        },
+        {
+          "indexname": "idx_fact_disease",
+          "tablename": "fact_disease_incidence",
+          "indexdef": "CREATE INDEX idx_fact_disease ON public.fact_disease_incidence USING btree (disease_key)"
+        },
+        {
+          "indexname": "idx_fact_location",
+          "tablename": "fact_disease_incidence",
+          "indexdef": "CREATE INDEX idx_fact_location ON public.fact_disease_incidence USING btree (location_key)"
+        },
+        {
+          "indexname": "idx_fact_time",
+          "tablename": "fact_disease_incidence",
+          "indexdef": "CREATE INDEX idx_fact_time ON public.fact_disease_incidence USING btree (time_key)"
+        },
+        {
+          "indexname": "idx_mv_monthly",
+          "tablename": "mv_monthly_disease_state",
+          "indexdef": "CREATE UNIQUE INDEX idx_mv_monthly ON public.mv_monthly_disease_state USING btree (disease_name, state_name, year, month)"
+        }
+      ]
+    },
+    "mongodb": {
+      "backend": "mongodb",
+      "database_size_bytes": 119061782.0,
+      "collections": [
+        {
+          "collection": "disease_observations",
+          "document_count": 155063,
+          "size_bytes": 117021147,
+          "avg_document_size_bytes": 754,
+          "indexes": [
+            {
+              "name": "_id_",
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ]
+            },
+            {
+              "name": "disease.name_1_time_bucket.year_1_location.state_code_1",
+              "keys": [
+                [
+                  "disease.name",
+                  1
+                ],
+                [
+                  "time_bucket.year",
+                  1
+                ],
+                [
+                  "location.state_code",
+                  1
+                ]
+              ]
+            },
+            {
+              "name": "location.region_1_time_bucket.decade_1",
+              "keys": [
+                [
+                  "location.region",
+                  1
+                ],
+                [
+                  "time_bucket.decade",
+                  1
+                ]
+              ]
+            },
+            {
+              "name": "time_bucket.year_1_time_bucket.month_1",
+              "keys": [
+                [
+                  "time_bucket.year",
+                  1
+                ],
+                [
+                  "time_bucket.month",
+                  1
+                ]
+              ]
+            },
+            {
+              "name": "location.loc_type_1_location.city_1",
+              "keys": [
+                [
+                  "location.loc_type",
+                  1
+                ],
+                [
+                  "location.city",
+                  1
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "collection": "summary_monthly_by_region",
+          "document_count": 14158,
+          "size_bytes": 2035309,
+          "avg_document_size_bytes": 143,
+          "indexes": [
+            {
+              "name": "_id_",
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "collection": "summary_decade_national",
+          "document_count": 46,
+          "size_bytes": 5326,
+          "avg_document_size_bytes": 115,
+          "indexes": [
+            {
+              "name": "_id_",
+              "keys": [
+                [
+                  "_id",
+                  1
+                ]
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    "neo4j": {
+      "backend": "neo4j",
+      "database_size_bytes": null,
+      "database_size_source": null,
+      "node_labels": [
+        {
+          "label": "Observation",
+          "count": 473189
+        },
+        {
+          "label": "MonthlyAggregate",
+          "count": 139683
+        },
+        {
+          "label": "Week",
+          "count": 4947
+        },
+        {
+          "label": "Month",
+          "count": 1152
+        },
+        {
+          "label": "Quarter",
+          "count": 384
+        },
+        {
+          "label": "City",
+          "count": 120
+        },
+        {
+          "label": "Year",
+          "count": 96
+        },
+        {
+          "label": "State",
+          "count": 51
+        },
+        {
+          "label": "Decade",
+          "count": 11
+        },
+        {
+          "label": "Disease",
+          "count": 8
+        },
+        {
+          "label": "Region",
+          "count": 4
+        },
+        {
+          "label": "Country",
+          "count": 1
+        }
+      ],
+      "relationship_types": [
+        {
+          "type": "AFFECTS",
+          "count": 473189
+        },
+        {
+          "type": "OBSERVED_AT",
+          "count": 473189
+        },
+        {
+          "type": "OBSERVED_IN",
+          "count": 387527
+        },
+        {
+          "type": "SUMMARIZES_DISEASE",
+          "count": 139683
+        },
+        {
+          "type": "SUMMARIZES_STATE",
+          "count": 139683
+        },
+        {
+          "type": "SUMMARIZES_MONTH",
+          "count": 139683
+        },
+        {
+          "type": "OBSERVED_IN_CITY",
+          "count": 85662
+        },
+        {
+          "type": "IN_MONTH",
+          "count": 4947
+        },
+        {
+          "type": "IN_QUARTER",
+          "count": 1152
+        },
+        {
+          "type": "IN_YEAR",
+          "count": 384
+        },
+        {
+          "type": "BORDERS",
+          "count": 214
+        },
+        {
+          "type": "LOCATED_IN_STATE",
+          "count": 120
+        },
+        {
+          "type": "IN_DECADE",
+          "count": 96
+        },
+        {
+          "type": "IN_REGION",
+          "count": 51
+        },
+        {
+          "type": "IN_COUNTRY",
+          "count": 4
+        }
+      ],
+      "constraints": [
+        {
+          "id": 10,
+          "name": "city_key",
+          "type": "NODE_PROPERTY_UNIQUENESS",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "City"
+          ],
+          "properties": [
+            "state_code",
+            "name"
+          ],
+          "enforcedLabel": null,
+          "ownedIndex": "city_key",
+          "propertyType": null
+        },
+        {
+          "id": 4,
+          "name": "disease_name",
+          "type": "NODE_PROPERTY_UNIQUENESS",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Disease"
+          ],
+          "properties": [
+            "name"
+          ],
+          "enforcedLabel": null,
+          "ownedIndex": "disease_name",
+          "propertyType": null
+        },
+        {
+          "id": 8,
+          "name": "region_name",
+          "type": "NODE_PROPERTY_UNIQUENESS",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Region"
+          ],
+          "properties": [
+            "name"
+          ],
+          "enforcedLabel": null,
+          "ownedIndex": "region_name",
+          "propertyType": null
+        },
+        {
+          "id": 6,
+          "name": "state_code",
+          "type": "NODE_PROPERTY_UNIQUENESS",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "State"
+          ],
+          "properties": [
+            "code"
+          ],
+          "enforcedLabel": null,
+          "ownedIndex": "state_code",
+          "propertyType": null
+        }
+      ],
+      "indexes": [
+        {
+          "id": 9,
+          "name": "city_key",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "City"
+          ],
+          "properties": [
+            "state_code",
+            "name"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": "city_key",
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85848344000000,
+              "_Time__hour": 23,
+              "_Time__minute": 50,
+              "_Time__second": 48,
+              "_Time__nanosecond": 344000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 85902
+        },
+        {
+          "id": 3,
+          "name": "disease_name",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Disease"
+          ],
+          "properties": [
+            "name"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": "disease_name",
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85848344000000,
+              "_Time__hour": 23,
+              "_Time__minute": 50,
+              "_Time__second": 48,
+              "_Time__nanosecond": 344000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 473197
+        },
+        {
+          "id": 2,
+          "name": "index_1b9dcc97",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "LOOKUP",
+          "entityType": "RELATIONSHIP",
+          "labelsOrTypes": null,
+          "properties": null,
+          "indexProvider": "token-lookup-1.0",
+          "owningConstraint": null,
+          "lastRead": null,
+          "readCount": 0
+        },
+        {
+          "id": 1,
+          "name": "index_460996c0",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "LOOKUP",
+          "entityType": "NODE",
+          "labelsOrTypes": null,
+          "properties": null,
+          "indexProvider": "token-lookup-1.0",
+          "owningConstraint": null,
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 86386688000000,
+              "_Time__hour": 23,
+              "_Time__minute": 59,
+              "_Time__second": 46,
+              "_Time__nanosecond": 688000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 1640
+        },
+        {
+          "id": 12,
+          "name": "month_year",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Month"
+          ],
+          "properties": [
+            "year",
+            "month"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": null,
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85801096000000,
+              "_Time__hour": 23,
+              "_Time__minute": 50,
+              "_Time__second": 1,
+              "_Time__nanosecond": 96000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 6099
+        },
+        {
+          "id": 7,
+          "name": "region_name",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Region"
+          ],
+          "properties": [
+            "name"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": "region_name",
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85770299000000,
+              "_Time__hour": 23,
+              "_Time__minute": 49,
+              "_Time__second": 30,
+              "_Time__nanosecond": 299000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 59
+        },
+        {
+          "id": 5,
+          "name": "state_code",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "State"
+          ],
+          "properties": [
+            "code"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": "state_code",
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85840700000000,
+              "_Time__hour": 23,
+              "_Time__minute": 50,
+              "_Time__second": 40,
+              "_Time__nanosecond": 700000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 388177
+        },
+        {
+          "id": 11,
+          "name": "week_epi",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Week"
+          ],
+          "properties": [
+            "epi_week"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": null,
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 85848344000000,
+              "_Time__hour": 23,
+              "_Time__minute": 50,
+              "_Time__second": 48,
+              "_Time__nanosecond": 344000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 478136
+        },
+        {
+          "id": 13,
+          "name": "year_val",
+          "state": "ONLINE",
+          "populationPercent": 100.0,
+          "type": "RANGE",
+          "entityType": "NODE",
+          "labelsOrTypes": [
+            "Year"
+          ],
+          "properties": [
+            "year"
+          ],
+          "indexProvider": "range-1.0",
+          "owningConstraint": null,
+          "lastRead": {
+            "_DateTime__date": {
+              "_Date__ordinal": 739726,
+              "_Date__year": 2026,
+              "_Date__month": 4,
+              "_Date__day": 20
+            },
+            "_DateTime__time": {
+              "_Time__ticks": 86381646000000,
+              "_Time__hour": 23,
+              "_Time__minute": 59,
+              "_Time__second": 41,
+              "_Time__nanosecond": 646000000,
+              "_Time__tzinfo": {}
+            }
+          },
+          "readCount": 495
+        }
+      ]
+    }
+  }
+}
