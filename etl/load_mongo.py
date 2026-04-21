@@ -1,6 +1,7 @@
 """
-Load data into MongoDB document data warehouse using the Bucket Pattern.
-Groups weekly observations into monthly buckets per disease/state.
+Load data into MongoDB using the bucket pattern. Each bucket holds all weekly
+observations for one (disease, location, year, month) cell, with a precomputed
+monthly summary subdocument. Handles both STATE-grain and CITY-grain rows.
 """
 
 import os
@@ -33,29 +34,28 @@ def load_mongo():
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     start = time.time()
 
-    # Read source data
-    print("Reading source data...")
-    tycho = pd.read_csv(os.path.join(base, "data", "raw", "tycho_level1.csv"))
+    active_file = os.environ.get("TYCHO_DATA_FILE", "tycho_level1.csv")
+    print("Reading source data (%s)..." % active_file)
+    tycho = pd.read_csv(os.path.join(base, "data", "raw", active_file), low_memory=False)
     regions = pd.read_csv(os.path.join(base, "data", "reference", "us_regions.csv"))
     diseases = pd.read_csv(os.path.join(base, "data", "reference", "disease_metadata.csv"))
-    print(f"  Raw rows: {len(tycho):,}")
+    print("  Raw rows %d" % len(tycho))
 
-    # Clean
-    tycho = tycho.dropna(subset=["cases", "disease", "state", "epi_week"])
+    tycho = tycho.dropna(subset=["cases", "disease", "state", "epi_week", "loc_type"])
     tycho["cases"] = pd.to_numeric(tycho["cases"], errors="coerce")
     tycho = tycho[tycho["cases"] > 0].copy()
     tycho["cases"] = tycho["cases"].astype(int)
     tycho["disease"] = tycho["disease"].str.strip().str.upper()
     tycho["state"] = tycho["state"].str.strip().str.upper()
+    tycho["loc_type"] = tycho["loc_type"].str.strip().str.upper()
+    tycho["loc"] = tycho["loc"].astype(str).str.strip().str.upper()
     tycho["epi_week"] = tycho["epi_week"].astype(int)
     tycho["incidence_per_100000"] = pd.to_numeric(tycho["incidence_per_100000"], errors="coerce").fillna(0.0)
 
-    # Derive time fields
     tycho["year"] = tycho["epi_week"] // 100
     tycho["week_number"] = tycho["epi_week"] % 100
     tycho["month"] = ((tycho["week_number"] - 1) * 12 // 52 + 1).clip(1, 12)
 
-    # Build lookups
     region_map = {}
     for _, r in regions.iterrows():
         region_map[r["state_code"]] = {
@@ -75,26 +75,27 @@ def load_mongo():
             "vaccine_year": int(d["vaccine_intro_year"]),
         }
 
-    # Group into bucket documents
     print("Building bucket documents...")
-    grouped = tycho.groupby(["disease", "state", "year", "month"])
+    tycho = tycho.sort_values(["disease", "state", "loc", "loc_type", "year", "month", "epi_week"])
     docs = []
-    for (disease, state, year, month), group in grouped:
+    group_cols = ["disease", "state", "loc", "loc_type", "year", "month"]
+    for keys, group in tycho.groupby(group_cols, sort=False):
+        disease, state, loc, loc_type, year, month = keys
         ri = region_map.get(state, {})
         di = disease_map.get(disease, {})
 
-        weekly_obs = []
-        for _, row in group.iterrows():
-            weekly_obs.append({
-                "epi_week": int(row["epi_week"]),
-                "week": int(row["week_number"]),
-                "cases": int(row["cases"]),
-                "incidence_rate": round(float(row["incidence_per_100000"]), 4),
-            })
+        epi_weeks = group["epi_week"].astype(int).tolist()
+        weeks = group["week_number"].astype(int).tolist()
+        cases_list = group["cases"].astype(int).tolist()
+        rates = group["incidence_per_100000"].astype(float).round(4).tolist()
+        weekly_obs = [
+            {"epi_week": ew, "week": w, "cases": c, "incidence_rate": r}
+            for ew, w, c, r in zip(epi_weeks, weeks, cases_list, rates)
+        ]
 
-        total_cases = sum(w["cases"] for w in weekly_obs)
-        avg_rate = round(float(np.mean([w["incidence_rate"] for w in weekly_obs])), 4)
-        peak = max(w["cases"] for w in weekly_obs)
+        total_cases = int(sum(cases_list))
+        avg_rate = round(sum(rates) / len(rates), 4) if rates else 0.0
+        peak = int(max(cases_list)) if cases_list else 0
         quarter = (int(month) - 1) // 3 + 1
         decade = (int(year) // 10) * 10
 
@@ -107,12 +108,12 @@ def load_mongo():
                 "vaccine_year": di.get("vaccine_year"),
             },
             "location": {
-                "city": None,
+                "city": loc if loc_type == "CITY" else None,
                 "state_code": state,
                 "state_name": ri.get("state_name", state),
                 "region": ri.get("region", ""),
                 "division": ri.get("division", ""),
-                "loc_type": "STATE",
+                "loc_type": loc_type,
                 "coordinates": {"lat": ri.get("lat"), "lng": ri.get("lng")},
             },
             "time_bucket": {
@@ -132,11 +133,10 @@ def load_mongo():
         })
 
         if len(docs) % 50000 == 0:
-            print(f"  Built {len(docs):,} documents...")
+            print("  Built %d documents..." % len(docs))
 
-    print(f"  Total bucket documents: {len(docs):,}")
+    print("  Total bucket documents %d" % len(docs))
 
-    # Connect and load
     client = get_client()
     db = client["epidemiological_dw"]
 
@@ -145,14 +145,13 @@ def load_mongo():
     db.summary_monthly_by_region.drop()
     db.summary_decade_national.drop()
 
-    print(f"Inserting {len(docs):,} documents in batches...")
+    print("Inserting %d documents in batches..." % len(docs))
     batch_size = 10000
     for i in range(0, len(docs), batch_size):
         batch = docs[i:i + batch_size]
         db.disease_observations.insert_many(batch)
-        print(f"  {min(i + batch_size, len(docs)):,} / {len(docs):,} inserted")
+        print("  %d / %d inserted" % (min(i + batch_size, len(docs)), len(docs)))
 
-    # Create indexes
     print("Creating indexes...")
     db.disease_observations.create_index([
         ("disease.name", 1), ("time_bucket.year", 1), ("location.state_code", 1)
@@ -163,10 +162,13 @@ def load_mongo():
     db.disease_observations.create_index([
         ("time_bucket.year", 1), ("time_bucket.month", 1)
     ])
+    db.disease_observations.create_index([
+        ("location.loc_type", 1), ("location.city", 1)
+    ])
 
-    # Run pre-aggregation pipelines
-    print("Running pre-aggregation: summary_monthly_by_region...")
+    print("Running pre-aggregation summary_monthly_by_region...")
     db.disease_observations.aggregate([
+        {"$match": {"location.loc_type": "STATE"}},
         {"$group": {
             "_id": {
                 "disease": "$disease.name",
@@ -182,7 +184,7 @@ def load_mongo():
         {"$merge": {"into": "summary_monthly_by_region", "whenMatched": "replace"}},
     ])
 
-    print("Running pre-aggregation: summary_decade_national...")
+    print("Running pre-aggregation summary_decade_national...")
     db.disease_observations.aggregate([
         {"$group": {
             "_id": {
@@ -197,16 +199,15 @@ def load_mongo():
         {"$merge": {"into": "summary_decade_national", "whenMatched": "replace"}},
     ])
 
-    # Verify counts
     obs_count = db.disease_observations.count_documents({})
     monthly_count = db.summary_monthly_by_region.count_documents({})
     decade_count = db.summary_decade_national.count_documents({})
 
     elapsed = time.time() - start
-    print(f"\nMongoDB load complete in {elapsed:.1f}s")
-    print(f"  disease_observations: {obs_count:,}")
-    print(f"  summary_monthly_by_region: {monthly_count:,}")
-    print(f"  summary_decade_national: {decade_count:,}")
+    print("\nMongoDB load complete in %.1fs" % elapsed)
+    print("  disease_observations %d" % obs_count)
+    print("  summary_monthly_by_region %d" % monthly_count)
+    print("  summary_decade_national %d" % decade_count)
 
     client.close()
 

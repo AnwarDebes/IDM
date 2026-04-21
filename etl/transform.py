@@ -1,13 +1,24 @@
 """
-Transform module: cleans raw data and builds all structures needed for loading
-into PostgreSQL (star schema), MongoDB (bucket documents), and Neo4j (graph CSVs).
+Transform module. Cleans the raw Tycho rows and builds every structure
+needed by the three storage layers.
+
+    PostgreSQL star schema, columnar fact plus three dimensions
+    MongoDB bucket pattern, one document per disease, location, year, month
+    Neo4j multi-hierarchy graph, time, place, and disease ontologies
+
+The pipeline is dataset-agnostic. It accepts both the real Project Tycho
+Level 1 export (which mixes STATE-grain and CITY-grain rows for
+diphtheria) and the synthetic benchmark (which is pure STATE grain).
+City rows propagate all the way through to PostgreSQL and MongoDB and
+are surfaced via dim_location.loc_type plus the mv_yearly_disease_city
+materialized view.
 """
 
 import os
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 
-import pandas as pd
 import numpy as np
+import pandas as pd
 
 from etl.extract import RawData
 
@@ -24,31 +35,36 @@ class TransformResult:
     dim_location: pd.DataFrame
     dim_disease: pd.DataFrame
     fact_table: pd.DataFrame
-    mongo_documents: list[dict]
-    neo4j_nodes: dict  # label -> list of dicts
-    neo4j_rels: dict   # type -> list of dicts
+    mongo_documents: list
+    neo4j_nodes: dict
+    neo4j_rels: dict
+    source_label: str
 
 
-def _clean_raw(tycho: pd.DataFrame) -> pd.DataFrame:
-    """Clean raw data: drop bad rows, standardize fields."""
+def _clean_raw(tycho):
+    """Drop bad rows, normalize fields, retain loc_type variation."""
     df = tycho.copy()
-    df = df.dropna(subset=["cases", "disease", "state", "epi_week"])
+    required = ["cases", "disease", "state", "epi_week", "loc_type"]
+    df = df.dropna(subset=required)
     df["cases"] = pd.to_numeric(df["cases"], errors="coerce")
     df = df[df["cases"] > 0].copy()
     df["cases"] = df["cases"].astype(int)
     df["disease"] = df["disease"].str.strip().str.upper()
     df["state"] = df["state"].str.strip().str.upper()
+    df["loc_type"] = df["loc_type"].str.strip().str.upper()
+    df["loc"] = df["loc"].astype(str).str.strip().str.upper()
     df["epi_week"] = df["epi_week"].astype(int)
     df["incidence_per_100000"] = pd.to_numeric(df["incidence_per_100000"], errors="coerce").fillna(0.0)
-    print(f"  After cleaning: {len(df):,} rows")
+
+    state_rows = (df["loc_type"] == "STATE").sum()
+    city_rows = (df["loc_type"] == "CITY").sum()
+    print("  After cleaning %d rows total, STATE=%d, CITY=%d" % (len(df), state_rows, city_rows))
     return df
 
 
-def _derive_time_fields(epi_week: int) -> dict:
-    """Derive all time dimension fields from an epi_week integer (YYYYWW)."""
+def _derive_time_fields(epi_week):
     year = epi_week // 100
     week = epi_week % 100
-    # Approximate month from week number
     month = min(12, max(1, int((week - 1) * 12 / 52) + 1))
     quarter = (month - 1) // 3 + 1
     decade = (year // 10) * 10
@@ -69,110 +85,116 @@ def _derive_time_fields(epi_week: int) -> dict:
     }
 
 
-def _build_dim_time(df: pd.DataFrame) -> pd.DataFrame:
-    """Build time dimension from unique epi_weeks."""
+def _build_dim_time(df):
     unique_weeks = sorted(df["epi_week"].unique())
-    records = [_derive_time_fields(ew) for ew in unique_weeks]
+    records = [_derive_time_fields(int(ew)) for ew in unique_weeks]
     dim = pd.DataFrame(records)
     dim["time_key"] = range(1, len(dim) + 1)
-    print(f"  dim_time: {len(dim):,} rows")
+    print("  dim_time %d rows (years %d to %d)" % (len(dim), int(dim["year"].min()), int(dim["year"].max())))
     return dim
 
 
-def _build_dim_location(df: pd.DataFrame, regions: pd.DataFrame) -> pd.DataFrame:
-    """Build location dimension by joining with regions reference."""
-    # Get unique state-level locations
-    states = df[["state"]].drop_duplicates().copy()
-    states.rename(columns={"state": "state_code"}, inplace=True)
+def _build_dim_location(df, regions):
+    """Build location dimension covering both STATE and CITY grain."""
+    state_rows = df[df["loc_type"] == "STATE"][["state"]].drop_duplicates().copy()
+    state_rows.rename(columns={"state": "state_code"}, inplace=True)
+    state_dim = state_rows.merge(regions, on="state_code", how="left")
+    state_dim["city_name"] = None
+    state_dim["loc_type"] = "STATE"
 
-    dim = states.merge(regions, on="state_code", how="left")
-    dim["city_name"] = None
-    dim["loc_type"] = "STATE"
+    city_rows = df[df["loc_type"] == "CITY"][["state", "loc"]].drop_duplicates().copy()
+    city_rows.rename(columns={"state": "state_code", "loc": "city_name"}, inplace=True)
+    city_dim = city_rows.merge(regions, on="state_code", how="left")
+    city_dim["loc_type"] = "CITY"
+
+    dim = pd.concat([state_dim, city_dim], ignore_index=True)
     dim["location_key"] = range(1, len(dim) + 1)
 
     cols = ["location_key", "city_name", "state_code", "state_name",
             "census_region", "census_division", "loc_type", "latitude", "longitude"]
     dim = dim[cols].copy()
-    print(f"  dim_location: {len(dim):,} rows")
+    print("  dim_location %d rows (STATE=%d, CITY=%d)" % (
+        len(dim),
+        (dim["loc_type"] == "STATE").sum(),
+        (dim["loc_type"] == "CITY").sum(),
+    ))
     return dim
 
 
-def _build_dim_disease(diseases: pd.DataFrame) -> pd.DataFrame:
-    """Build disease dimension from reference data."""
+def _build_dim_disease(diseases):
     dim = diseases.copy()
     dim["disease_key"] = range(1, len(dim) + 1)
-    dim.rename(columns={
-        "disease_name": "disease_name",
-        "disease_category": "disease_category",
-        "transmission_type": "transmission_type",
-        "is_vaccine_preventable": "is_vaccine_preventable",
-        "vaccine_intro_year": "vaccine_intro_year",
-    }, inplace=True)
     dim["is_vaccine_preventable"] = dim["is_vaccine_preventable"].map(
         lambda x: True if str(x).lower() == "true" else False
     )
-    print(f"  dim_disease: {len(dim):,} rows")
+    print("  dim_disease %d rows" % len(dim))
     return dim
 
 
-def _build_fact_table(
-    df: pd.DataFrame,
-    dim_time: pd.DataFrame,
-    dim_location: pd.DataFrame,
-    dim_disease: pd.DataFrame,
-    populations: pd.DataFrame,
-) -> pd.DataFrame:
-    """Build fact table by mapping raw data to dimension keys."""
-    # Create lookup maps
+def _location_lookup(dim_location):
+    """Build a (state_code, loc_type, city_name_or_None) -> location_key map."""
+    lookup = {}
+    for _, row in dim_location.iterrows():
+        key = (row["state_code"], row["loc_type"], row["city_name"])
+        lookup[key] = int(row["location_key"])
+    return lookup
+
+
+def _build_fact_table(df, dim_time, dim_location, dim_disease, populations):
+    """Vectorized fact table build. Population is NULL for CITY-grain rows."""
+    fact = df[["epi_week", "state", "loc", "loc_type", "disease",
+               "cases", "incidence_per_100000"]].copy()
+
+    # Time key
     time_map = dict(zip(dim_time["epi_week"], dim_time["time_key"]))
-    loc_map = dict(zip(dim_location["state_code"], dim_location["location_key"]))
+    fact["time_key"] = fact["epi_week"].map(time_map)
+
+    # Disease key
     disease_map = dict(zip(dim_disease["disease_name"], dim_disease["disease_key"]))
+    fact["disease_key"] = fact["disease"].map(disease_map)
 
-    # Build population lookup: (state, decade) -> population
-    pop_map = {}
-    for _, row in populations.iterrows():
-        pop_map[(row["state_code"], int(row["decade"]))] = int(row["population"])
+    # Location key, joined separately for STATE and CITY then concatenated
+    state_locs = dim_location[dim_location["loc_type"] == "STATE"][["state_code", "location_key"]]
+    state_locs = state_locs.rename(columns={"state_code": "state", "location_key": "lk_state"})
+    city_locs = dim_location[dim_location["loc_type"] == "CITY"][["state_code", "city_name", "location_key"]]
+    city_locs = city_locs.rename(columns={"state_code": "state", "city_name": "loc", "location_key": "lk_city"})
 
-    fact_rows = []
-    for _, row in df.iterrows():
-        tk = time_map.get(row["epi_week"])
-        lk = loc_map.get(row["state"])
-        dk = disease_map.get(row["disease"])
-        if tk is None or lk is None or dk is None:
-            continue
+    fact = fact.merge(state_locs, on="state", how="left")
+    fact = fact.merge(city_locs, on=["state", "loc"], how="left")
+    fact["location_key"] = np.where(
+        fact["loc_type"] == "STATE",
+        fact["lk_state"],
+        fact["lk_city"],
+    )
 
-        year = row["epi_week"] // 100
-        decade = (year // 10) * 10
-        pop = pop_map.get((row["state"], decade))
+    # Population, joined on state and decade. NULL for CITY rows.
+    fact["year"] = fact["epi_week"] // 100
+    fact["decade"] = (fact["year"] // 10) * 10
+    pop_df = populations.rename(columns={"state_code": "state"})[["state", "decade", "population"]]
+    fact = fact.merge(pop_df, on=["state", "decade"], how="left")
+    fact.loc[fact["loc_type"] == "CITY", "population"] = np.nan
 
-        fact_rows.append({
-            "time_key": tk,
-            "location_key": lk,
-            "disease_key": dk,
-            "case_count": int(row["cases"]),
-            "incidence_rate": round(float(row["incidence_per_100000"]), 4),
-            "population": pop,
-        })
-
-    fact = pd.DataFrame(fact_rows)
+    fact = fact.dropna(subset=["time_key", "location_key", "disease_key"])
+    fact["case_count"] = fact["cases"].astype(int)
+    fact["incidence_rate"] = fact["incidence_per_100000"].round(4)
+    fact["population"] = fact["population"].astype("Int64")
+    fact = fact[["time_key", "location_key", "disease_key", "case_count",
+                 "incidence_rate", "population"]].reset_index(drop=True)
+    fact["time_key"] = fact["time_key"].astype(int)
+    fact["location_key"] = fact["location_key"].astype(int)
+    fact["disease_key"] = fact["disease_key"].astype(int)
     fact["incidence_key"] = range(1, len(fact) + 1)
-    print(f"  fact_table: {len(fact):,} rows")
+    print("  fact_table %d rows" % len(fact))
     return fact
 
 
-def _build_mongo_documents(
-    df: pd.DataFrame,
-    regions: pd.DataFrame,
-    diseases: pd.DataFrame,
-) -> list[dict]:
-    """Build MongoDB bucket-pattern documents grouped by disease+state+year+month."""
-    # Enrich df with time fields
+def _build_mongo_documents(df, regions, diseases):
+    """Vectorized mongo bucket build. One bucket per disease, location, year, month."""
     df = df.copy()
     df["year"] = df["epi_week"] // 100
     df["week_number"] = df["epi_week"] % 100
-    df["month"] = df["week_number"].apply(lambda w: min(12, max(1, int((w - 1) * 12 / 52) + 1)))
+    df["month"] = np.minimum(12, np.maximum(1, ((df["week_number"] - 1) * 12 // 52) + 1))
 
-    # Build lookup maps
     region_map = {}
     for _, r in regions.iterrows():
         region_map[r["state_code"]] = {
@@ -192,28 +214,29 @@ def _build_mongo_documents(
             "vaccine_year": int(d["vaccine_intro_year"]),
         }
 
-    # Group by disease + state + year + month
-    grouped = df.groupby(["disease", "state", "year", "month"])
+    df = df.sort_values(["disease", "state", "loc", "loc_type", "year", "month", "epi_week"])
+
     docs = []
-    for (disease, state, year, month), group in grouped:
+    group_cols = ["disease", "state", "loc", "loc_type", "year", "month"]
+    for keys, group in df.groupby(group_cols, sort=False):
+        disease, state, loc, loc_type, year, month = keys
         region_info = region_map.get(state, {})
         disease_info = disease_map.get(disease, {})
 
-        weekly_obs = []
-        for _, row in group.iterrows():
-            weekly_obs.append({
-                "epi_week": int(row["epi_week"]),
-                "week": int(row["week_number"]),
-                "cases": int(row["cases"]),
-                "incidence_rate": round(float(row["incidence_per_100000"]), 4),
-            })
+        epi_weeks = group["epi_week"].astype(int).tolist()
+        weeks = group["week_number"].astype(int).tolist()
+        cases_list = group["cases"].astype(int).tolist()
+        rates = group["incidence_per_100000"].astype(float).round(4).tolist()
+        weekly_obs = [
+            {"epi_week": ew, "week": w, "cases": c, "incidence_rate": r}
+            for ew, w, c, r in zip(epi_weeks, weeks, cases_list, rates)
+        ]
 
-        total_cases = sum(w["cases"] for w in weekly_obs)
-        avg_rate = round(np.mean([w["incidence_rate"] for w in weekly_obs]), 4) if weekly_obs else 0
-        peak = max(w["cases"] for w in weekly_obs) if weekly_obs else 0
-
-        quarter = (month - 1) // 3 + 1
-        decade = (year // 10) * 10
+        total_cases = int(sum(cases_list))
+        avg_rate = float(round(sum(rates) / len(rates), 4)) if rates else 0.0
+        peak = int(max(cases_list)) if cases_list else 0
+        quarter = int((int(month) - 1) // 3 + 1)
+        decade = int((int(year) // 10) * 10)
 
         doc = {
             "disease": {
@@ -224,12 +247,12 @@ def _build_mongo_documents(
                 "vaccine_year": disease_info.get("vaccine_year"),
             },
             "location": {
-                "city": None,
+                "city": loc if loc_type == "CITY" else None,
                 "state_code": state,
                 "state_name": region_info.get("state_name", state),
                 "region": region_info.get("region", ""),
                 "division": region_info.get("division", ""),
-                "loc_type": "STATE",
+                "loc_type": loc_type,
                 "coordinates": {
                     "lat": region_info.get("lat"),
                     "lng": region_info.get("lng"),
@@ -252,94 +275,84 @@ def _build_mongo_documents(
         }
         docs.append(doc)
 
-    print(f"  mongo_documents: {len(docs):,} bucket documents")
+    print("  mongo_documents %d bucket documents" % len(docs))
     return docs
 
 
-def _build_neo4j_data(
-    df: pd.DataFrame,
-    dim_time: pd.DataFrame,
-    dim_location: pd.DataFrame,
-    dim_disease: pd.DataFrame,
-    borders: pd.DataFrame,
-) -> tuple[dict, dict]:
-    """Build Neo4j node and relationship data for CSV import."""
+def _build_neo4j_data(df, dim_time, dim_location, dim_disease, borders):
+    """Construct Neo4j node and relationship payloads for batch loading."""
     nodes = {}
     rels = {}
 
-    # Disease nodes
-    nodes["Disease"] = dim_disease[["disease_name", "disease_category", "transmission_type",
-                                     "is_vaccine_preventable", "vaccine_intro_year"]].to_dict("records")
+    nodes["Disease"] = dim_disease[[
+        "disease_name", "disease_category", "transmission_type",
+        "is_vaccine_preventable", "vaccine_intro_year",
+    ]].to_dict("records")
 
-    # Region nodes
-    regions = dim_location[["census_region"]].drop_duplicates()
-    nodes["Region"] = [{"name": r} for r in sorted(regions["census_region"].unique())]
+    state_only = dim_location[dim_location["loc_type"] == "STATE"]
+    regions = state_only[["census_region"]].drop_duplicates()
+    nodes["Region"] = [{"name": r} for r in sorted(regions["census_region"].dropna().unique())]
 
-    # State nodes
-    nodes["State"] = dim_location[["state_code", "state_name", "census_region",
-                                    "census_division", "latitude", "longitude"]].to_dict("records")
+    nodes["State"] = state_only[[
+        "state_code", "state_name", "census_region",
+        "census_division", "latitude", "longitude",
+    ]].to_dict("records")
 
-    # Time hierarchy: Decade -> Year -> Quarter -> Month -> Week
+    city_only = dim_location[dim_location["loc_type"] == "CITY"]
+    nodes["City"] = city_only[["city_name", "state_code", "census_region"]].to_dict("records")
+
     decades = sorted(dim_time["decade"].unique())
     nodes["Decade"] = [{"decade": int(d)} for d in decades]
 
     years = sorted(dim_time["year"].unique())
     nodes["Year"] = [{"year": int(y)} for y in years]
 
-    # Build quarter data
     quarter_set = set()
     for _, row in dim_time.iterrows():
         quarter_set.add((int(row["year"]), int(row["quarter"])))
     nodes["Quarter"] = [{"year": y, "quarter": q} for y, q in sorted(quarter_set)]
 
-    # Build month data
     month_set = set()
     for _, row in dim_time.iterrows():
         month_set.add((int(row["year"]), int(row["month"]), row["month_name"]))
     nodes["Month"] = [{"year": y, "month": m, "month_name": mn} for y, m, mn in sorted(month_set)]
 
-    # Week nodes
     nodes["Week"] = dim_time[["epi_week", "week_number", "year", "month"]].to_dict("records")
 
-    # Relationships
-    # State -> Region (IN_REGION)
-    rels["IN_REGION"] = dim_location[["state_code", "census_region"]].to_dict("records")
+    rels["IN_REGION"] = state_only[["state_code", "census_region"]].to_dict("records")
 
-    # Week -> Month (IN_MONTH)
+    rels["LOCATED_IN_STATE"] = city_only[["city_name", "state_code"]].to_dict("records")
+
     rels["IN_MONTH"] = dim_time[["epi_week", "year", "month"]].to_dict("records")
 
-    # Month -> Quarter (IN_QUARTER)
-    rels["IN_QUARTER"] = [{"year": m["year"], "month": m["month"], "quarter": (m["month"] - 1) // 3 + 1}
-                          for m in nodes["Month"]]
+    rels["IN_QUARTER"] = [
+        {"year": m["year"], "month": m["month"], "quarter": (m["month"] - 1) // 3 + 1}
+        for m in nodes["Month"]
+    ]
 
-    # Quarter -> Year (IN_YEAR)
     rels["IN_YEAR_Q"] = [{"year": q["year"], "quarter": q["quarter"]} for q in nodes["Quarter"]]
 
-    # Year -> Decade (IN_DECADE)
     rels["IN_DECADE"] = [{"year": y, "decade": (y // 10) * 10} for y in years]
 
-    # Border relationships
     border_rels = []
     for _, row in borders.iterrows():
         state = row["state_code"]
-        for neighbor in row["borders"].split():
+        for neighbor in str(row["borders"]).split():
             border_rels.append({"from": state, "to": neighbor.strip()})
     rels["BORDERS"] = border_rels
 
-    # Observation data (for batch loading into Neo4j)
-    # We store the raw fact data for creating Observation nodes
     enriched = df.copy()
     enriched["year"] = enriched["epi_week"] // 100
-    rels["OBSERVATIONS"] = enriched[["epi_week", "state", "disease", "cases", "incidence_per_100000"]].to_dict("records")
+    rels["OBSERVATIONS"] = enriched[[
+        "epi_week", "state", "loc", "loc_type", "disease", "cases", "incidence_per_100000",
+    ]].to_dict("records")
 
-    print(f"  neo4j nodes: {sum(len(v) for v in nodes.values()):,} total across {len(nodes)} labels")
-    print(f"  neo4j rels: {sum(len(v) for v in rels.values()):,} total across {len(rels)} types")
-
+    print("  neo4j nodes %d total across %d labels" % (sum(len(v) for v in nodes.values()), len(nodes)))
+    print("  neo4j rels  %d total across %d types" % (sum(len(v) for v in rels.values()), len(rels)))
     return nodes, rels
 
 
-def transform_all(raw: RawData) -> TransformResult:
-    """Run the full transformation pipeline."""
+def transform_all(raw):
     print("\n--- Cleaning raw data ---")
     cleaned = _clean_raw(raw.tycho)
 
@@ -367,6 +380,7 @@ def transform_all(raw: RawData) -> TransformResult:
         mongo_documents=mongo_docs,
         neo4j_nodes=neo4j_nodes,
         neo4j_rels=neo4j_rels,
+        source_label=raw.source_label,
     )
 
 
@@ -379,11 +393,11 @@ if __name__ == "__main__":
         os.path.join(base, "data", "reference"),
     )
     result = transform_all(raw)
-    print(f"\n=== Transform Summary ===")
-    print(f"dim_time:    {len(result.dim_time):,}")
-    print(f"dim_location: {len(result.dim_location):,}")
-    print(f"dim_disease: {len(result.dim_disease):,}")
-    print(f"fact_table:  {len(result.fact_table):,}")
-    print(f"mongo_docs:  {len(result.mongo_documents):,}")
-    print(f"neo4j_nodes: {len(result.neo4j_nodes)} labels")
-    print(f"neo4j_rels:  {len(result.neo4j_rels)} types")
+    print("\n=== Transform Summary (source=%s) ===" % result.source_label)
+    print("dim_time:    %d" % len(result.dim_time))
+    print("dim_location:%d" % len(result.dim_location))
+    print("dim_disease: %d" % len(result.dim_disease))
+    print("fact_table:  %d" % len(result.fact_table))
+    print("mongo_docs:  %d" % len(result.mongo_documents))
+    print("neo4j_nodes: %d labels" % len(result.neo4j_nodes))
+    print("neo4j_rels:  %d types" % len(result.neo4j_rels))

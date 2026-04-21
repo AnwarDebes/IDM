@@ -1,6 +1,7 @@
 """
-Load data into the PostgreSQL star schema.
-Uses vectorized pandas operations and COPY for fast bulk loading.
+Load data into the PostgreSQL star schema. Uses vectorized pandas operations
+and COPY for fast bulk loading. Handles both STATE-grain rows and the
+CITY-grain rows that the real Project Tycho export uses for diphtheria.
 """
 
 import io
@@ -11,7 +12,6 @@ import time
 import numpy as np
 import pandas as pd
 import psycopg2
-from psycopg2.extras import execute_values
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -33,30 +33,34 @@ def get_connection():
 
 
 def load_postgres_direct():
-    """Build dimensions and facts directly with vectorized ops, then bulk load."""
+    """Build dimensions and facts with vectorized ops, then bulk load through COPY."""
     base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     start = time.time()
 
-    # Read source data
-    print("Reading source data...")
-    tycho = pd.read_csv(os.path.join(base, "data", "raw", "tycho_level1.csv"))
+    active_file = os.environ.get("TYCHO_DATA_FILE", "tycho_level1.csv")
+    print("Reading source data (%s)..." % active_file)
+    tycho = pd.read_csv(os.path.join(base, "data", "raw", active_file), low_memory=False)
     regions = pd.read_csv(os.path.join(base, "data", "reference", "us_regions.csv"))
     diseases = pd.read_csv(os.path.join(base, "data", "reference", "disease_metadata.csv"))
     populations = pd.read_csv(os.path.join(base, "data", "reference", "state_populations.csv"))
-    print(f"  Raw rows: {len(tycho):,}")
+    print("  Raw rows %d" % len(tycho))
 
     # Clean
-    tycho = tycho.dropna(subset=["cases", "disease", "state", "epi_week"])
+    tycho = tycho.dropna(subset=["cases", "disease", "state", "epi_week", "loc_type"])
     tycho["cases"] = pd.to_numeric(tycho["cases"], errors="coerce")
     tycho = tycho[tycho["cases"] > 0].copy()
     tycho["cases"] = tycho["cases"].astype(int)
     tycho["disease"] = tycho["disease"].str.strip().str.upper()
     tycho["state"] = tycho["state"].str.strip().str.upper()
+    tycho["loc_type"] = tycho["loc_type"].str.strip().str.upper()
+    tycho["loc"] = tycho["loc"].astype(str).str.strip().str.upper()
     tycho["epi_week"] = tycho["epi_week"].astype(int)
     tycho["incidence_per_100000"] = pd.to_numeric(tycho["incidence_per_100000"], errors="coerce").fillna(0.0)
-    print(f"  After cleaning: {len(tycho):,}")
+    state_rows = (tycho["loc_type"] == "STATE").sum()
+    city_rows = (tycho["loc_type"] == "CITY").sum()
+    print("  After cleaning %d rows (STATE=%d, CITY=%d)" % (len(tycho), state_rows, city_rows))
 
-    # === Build dim_time ===
+    # --- dim_time ---
     print("Building dim_time...")
     unique_weeks = pd.DataFrame({"epi_week": sorted(tycho["epi_week"].unique())})
     unique_weeks["week_number"] = unique_weeks["epi_week"] % 100
@@ -69,51 +73,77 @@ def load_postgres_direct():
     unique_weeks["is_summer"] = unique_weeks["month"].isin([6, 7, 8])
     unique_weeks["is_flu_season"] = unique_weeks["month"].isin([10, 11, 12, 1, 2, 3])
     unique_weeks["time_key"] = range(1, len(unique_weeks) + 1)
-    print(f"  dim_time: {len(unique_weeks):,} rows")
+    print("  dim_time %d rows" % len(unique_weeks))
 
-    # === Build dim_location ===
+    # --- dim_location, STATE plus CITY ---
     print("Building dim_location...")
-    states = tycho[["state"]].drop_duplicates().rename(columns={"state": "state_code"})
-    dim_loc = states.merge(regions, on="state_code", how="left")
-    dim_loc["city_name"] = None
-    dim_loc["loc_type"] = "STATE"
-    dim_loc["location_key"] = range(1, len(dim_loc) + 1)
-    print(f"  dim_location: {len(dim_loc):,} rows")
+    state_keys = tycho[tycho["loc_type"] == "STATE"][["state"]].drop_duplicates()
+    state_keys = state_keys.rename(columns={"state": "state_code"})
+    state_dim = state_keys.merge(regions, on="state_code", how="left")
+    state_dim["city_name"] = None
+    state_dim["loc_type"] = "STATE"
 
-    # === Build dim_disease ===
+    city_keys = tycho[tycho["loc_type"] == "CITY"][["state", "loc"]].drop_duplicates()
+    city_keys = city_keys.rename(columns={"state": "state_code", "loc": "city_name"})
+    city_dim = city_keys.merge(regions, on="state_code", how="left")
+    city_dim["loc_type"] = "CITY"
+
+    dim_loc = pd.concat([state_dim, city_dim], ignore_index=True)
+    dim_loc["location_key"] = range(1, len(dim_loc) + 1)
+    print("  dim_location %d rows (STATE=%d, CITY=%d)" % (
+        len(dim_loc),
+        (dim_loc["loc_type"] == "STATE").sum(),
+        (dim_loc["loc_type"] == "CITY").sum(),
+    ))
+
+    # --- dim_disease ---
     print("Building dim_disease...")
     dim_disease = diseases.copy()
     dim_disease["disease_key"] = range(1, len(dim_disease) + 1)
     dim_disease["is_vaccine_preventable"] = dim_disease["is_vaccine_preventable"].map(
         lambda x: True if str(x).lower() == "true" else False
     )
-    print(f"  dim_disease: {len(dim_disease):,} rows")
+    print("  dim_disease %d rows" % len(dim_disease))
 
-    # === Build fact table via merge (vectorized) ===
-    print("Building fact table (vectorized merge)...")
+    # --- fact table, vectorized ---
+    print("Building fact table (vectorized)...")
     time_map = unique_weeks[["epi_week", "time_key"]]
-    loc_map = dim_loc[["state_code", "location_key"]]
     disease_map = dim_disease[["disease_name", "disease_key"]]
 
     fact = tycho.merge(time_map, on="epi_week", how="inner")
-    fact = fact.merge(loc_map, left_on="state", right_on="state_code", how="inner")
     fact = fact.merge(disease_map, left_on="disease", right_on="disease_name", how="inner")
 
-    # Add population
+    # STATE-grain join
+    state_loc = dim_loc[dim_loc["loc_type"] == "STATE"][["state_code", "location_key"]]
+    state_loc = state_loc.rename(columns={"state_code": "state", "location_key": "lk_state"})
+    fact = fact.merge(state_loc, on="state", how="left")
+
+    # CITY-grain join
+    city_loc = dim_loc[dim_loc["loc_type"] == "CITY"][["state_code", "city_name", "location_key"]]
+    city_loc = city_loc.rename(columns={"state_code": "state", "city_name": "loc", "location_key": "lk_city"})
+    fact = fact.merge(city_loc, on=["state", "loc"], how="left")
+
+    fact["location_key"] = np.where(fact["loc_type"] == "STATE", fact["lk_state"], fact["lk_city"])
+    fact = fact.dropna(subset=["location_key"])
+    fact["location_key"] = fact["location_key"].astype(int)
+
+    # Population (only meaningful for STATE grain)
     fact["year"] = fact["epi_week"] // 100
     fact["decade"] = (fact["year"] // 10) * 10
-    pop_df = populations.rename(columns={"population": "pop"})
+    pop_df = populations.rename(columns={"population": "pop"})[["state_code", "decade", "pop"]]
     pop_df["decade"] = pop_df["decade"].astype(int)
     fact = fact.merge(pop_df, left_on=["state", "decade"], right_on=["state_code", "decade"], how="left")
+    fact.loc[fact["loc_type"] == "CITY", "pop"] = np.nan
+    fact["pop"] = fact["pop"].astype("Int64")
 
     fact["incidence_key"] = range(1, len(fact) + 1)
     fact = fact.rename(columns={"cases": "case_count", "incidence_per_100000": "incidence_rate", "pop": "population"})
     fact_cols_needed = ["incidence_key", "time_key", "location_key", "disease_key",
                         "case_count", "incidence_rate", "population"]
     fact = fact[fact_cols_needed].copy()
-    print(f"  fact_table: {len(fact):,} rows")
+    print("  fact_table %d rows" % len(fact))
 
-    # === Load into PostgreSQL ===
+    # --- Load ---
     conn = get_connection()
     cur = conn.cursor()
 
@@ -121,52 +151,52 @@ def load_postgres_direct():
     cur.execute("TRUNCATE fact_disease_incidence, dim_time, dim_location, dim_disease CASCADE")
     conn.commit()
 
-    # dim_time
-    print(f"Loading dim_time...")
+    print("Loading dim_time...")
     time_cols = ["time_key", "epi_week", "week_number", "month", "month_name",
                  "quarter", "year", "decade", "century", "is_summer", "is_flu_season"]
     _copy_df(cur, conn, unique_weeks[time_cols], "dim_time", time_cols)
 
-    # dim_location
-    print(f"Loading dim_location...")
+    print("Loading dim_location...")
     loc_cols_db = ["location_key", "city_name", "state_code", "state_name",
                    "census_region", "census_division", "loc_type", "latitude", "longitude"]
     _copy_df(cur, conn, dim_loc[loc_cols_db], "dim_location", loc_cols_db)
 
-    # dim_disease
-    print(f"Loading dim_disease...")
+    print("Loading dim_disease...")
     disease_cols_db = ["disease_key", "disease_name", "disease_category",
                        "transmission_type", "is_vaccine_preventable", "vaccine_intro_year"]
     _copy_df(cur, conn, dim_disease[disease_cols_db], "dim_disease", disease_cols_db)
 
-    # fact table via COPY (fast!)
-    print(f"Loading fact_disease_incidence ({len(fact):,} rows via COPY)...")
+    print("Loading fact_disease_incidence (%d rows via COPY)..." % len(fact))
     _copy_df(cur, conn, fact, "fact_disease_incidence", fact_cols_needed)
 
-    # Refresh materialized views
     print("Refreshing materialized views...")
-    for mv in ["mv_monthly_disease_state", "mv_yearly_disease_region", "mv_decade_disease_national"]:
-        cur.execute(f"REFRESH MATERIALIZED VIEW {mv}")
+    for mv in (
+        "mv_monthly_disease_state",
+        "mv_yearly_disease_region",
+        "mv_decade_disease_national",
+        "mv_yearly_disease_city",
+    ):
+        cur.execute("REFRESH MATERIALIZED VIEW %s" % mv)
         conn.commit()
-        print(f"  {mv} refreshed.")
+        print("  %s refreshed" % mv)
 
     cur.execute("ANALYZE")
     conn.commit()
 
     elapsed = time.time() - start
-    print(f"\nPostgreSQL load complete in {elapsed:.1f}s")
+    print("\nPostgreSQL load complete in %.1fs" % elapsed)
     cur.close()
     conn.close()
 
 
-def _copy_df(cur, conn, df: pd.DataFrame, table: str, columns: list[str]):
-    """Bulk load a DataFrame into a table using COPY protocol."""
+def _copy_df(cur, conn, df, table, columns):
+    """Bulk load a DataFrame into a table using the COPY protocol."""
     buf = io.StringIO()
     df.to_csv(buf, index=False, header=False, sep="\t", na_rep="\\N")
     buf.seek(0)
     cur.copy_from(buf, table, sep="\t", null="\\N", columns=columns)
     conn.commit()
-    print(f"  {table}: {len(df):,} rows loaded.")
+    print("  %s %d rows loaded" % (table, len(df)))
 
 
 if __name__ == "__main__":

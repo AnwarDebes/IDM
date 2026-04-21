@@ -1,5 +1,9 @@
 -- ============================================================
--- Epidemiological Data Warehouse — PostgreSQL Star Schema DDL
+-- Epidemiological Data Warehouse, PostgreSQL star schema DDL
+--
+-- Grain policy for dim_location.loc_type
+--   'STATE'   one row per US state or territory, city_name IS NULL
+--   'CITY'    one row per reporting city (used for pre-1948 diphtheria)
 -- ============================================================
 
 -- DIMENSION: Time
@@ -107,17 +111,37 @@ GROUP BY d.disease_name, d.disease_category, l.census_region, t.year, t.decade
 WITH NO DATA;
 
 -- SUMMARY 3: Decade-level national totals (highest roll-up)
+-- Includes both STATE and CITY grain. CITY rows (historical diphtheria)
+-- are rolled up via their state_code so national totals stay consistent.
 CREATE MATERIALIZED VIEW mv_decade_disease_national AS
 SELECT
     d.disease_name,
     t.decade,
     SUM(f.case_count) AS total_cases,
     AVG(f.incidence_rate) AS avg_incidence_rate,
-    COUNT(DISTINCT l.state_code) AS states_reporting
+    COUNT(DISTINCT l.state_code) AS states_reporting,
+    SUM(CASE WHEN l.loc_type = 'CITY' THEN f.case_count ELSE 0 END) AS cases_reported_at_city_grain
 FROM fact_disease_incidence f
 JOIN dim_disease d ON f.disease_key = d.disease_key
 JOIN dim_location l ON f.location_key = l.location_key
 JOIN dim_time t ON f.time_key = t.time_key
-WHERE l.loc_type = 'STATE'
 GROUP BY d.disease_name, t.decade
+WITH NO DATA;
+
+-- SUMMARY 4: City-level detail for diseases with sub-state reporting
+-- (primarily diphtheria pre-1948). Left empty where no city grain exists.
+CREATE MATERIALIZED VIEW mv_yearly_disease_city AS
+SELECT
+    d.disease_name,
+    l.city_name,
+    l.state_code,
+    t.year,
+    SUM(f.case_count) AS total_cases,
+    AVG(f.incidence_rate) AS avg_incidence_rate
+FROM fact_disease_incidence f
+JOIN dim_disease d ON f.disease_key = d.disease_key
+JOIN dim_location l ON f.location_key = l.location_key
+JOIN dim_time t ON f.time_key = t.time_key
+WHERE l.loc_type = 'CITY'
+GROUP BY d.disease_name, l.city_name, l.state_code, t.year
 WITH NO DATA;
