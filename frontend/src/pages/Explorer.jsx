@@ -179,7 +179,7 @@ export default function Explorer() {
 
         {currentQuery && (
           <p style={{ fontSize: '12px', color: colors.textMuted, marginTop: '8px' }}>
-            {currentQuery.olap_operation} — {currentQuery.description}
+            {currentQuery.olap_operation} - {currentQuery.description}
           </p>
         )}
       </div>

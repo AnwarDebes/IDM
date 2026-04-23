@@ -182,7 +182,7 @@ export default function Compare() {
 
       {allTimings.length > 1 && (
         <div style={layout.card}>
-          <p style={{ fontWeight: 600, fontSize: '14px', marginBottom: '16px' }}>All Queries — Execution Time (ms)</p>
+          <p style={{ fontWeight: 600, fontSize: '14px', marginBottom: '16px' }}>All Queries Execution Time (ms)</p>
           <ResponsiveContainer width="100%" height={Math.max(200, allTimings.length * 40)}>
             <BarChart data={allTimings} layout="vertical" margin={{ left: 40 }}>
               <CartesianGrid strokeDasharray="3 3" stroke={colors.border} />

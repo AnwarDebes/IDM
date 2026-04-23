@@ -29,7 +29,7 @@ QUERY_REGISTRY = {
         ],
     },
     "Q4": {
-        "name": "Seasonal pattern — avg weekly cases per month",
+        "name": "Seasonal pattern avg weekly cases per month",
         "description": "Roll-up + aggregation showing average weekly cases per calendar month for a disease.",
         "olap_operation": "Roll-up",
         "backends": ["postgres", "mongodb", "neo4j"],
@@ -50,21 +50,21 @@ QUERY_REGISTRY = {
         "params": [],
     },
     "Q7": {
-        "name": "Geographic spread — rank states by first report",
+        "name": "Geographic spread rank states by first report",
         "description": "Drill-down showing when each state first reported a disease, ranked chronologically.",
         "olap_operation": "Drill-down",
         "backends": ["postgres", "mongodb", "neo4j"],
         "params": [{"name": "disease", "type": "str", "default": "MEASLES"}],
     },
     "Q8": {
-        "name": "Vaccination impact — before/after comparison",
+        "name": "Vaccination impact before/after comparison",
         "description": "Slice + aggregation comparing average annual cases 10 years before vs 10 years after vaccine introduction.",
         "olap_operation": "Slice",
         "backends": ["postgres", "mongodb", "neo4j"],
         "params": [],
     },
     "Q9": {
-        "name": "Anomaly detection — states > 2 std dev above mean",
+        "name": "Anomaly detection states > 2 std dev above mean",
         "description": "Statistical analysis finding state-year combinations with cases more than 2 standard deviations above national mean.",
         "olap_operation": "Statistical",
         "backends": ["postgres", "mongodb", "neo4j"],

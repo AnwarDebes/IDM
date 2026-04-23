@@ -131,7 +131,7 @@ export default function Stream() {
               anomalies.map((a, i) => (
                 <div key={i} style={{ padding: '8px 10px', background: 'rgba(239,68,68,0.1)', borderRadius: '6px', marginBottom: '6px', borderLeft: `3px solid ${colors.error}` }}>
                   <p style={{ fontSize: '12px', fontWeight: 600, margin: 0 }}>
-                    {a.disease} — {a.state} (Week {a.epi_week})
+                    {a.disease} {a.state} (Week {a.epi_week})
                   </p>
                   <p style={{ fontSize: '11px', color: colors.textMuted, margin: '2px 0 0' }}>
                     {a.cases} cases, rate: {a.incidence_rate} | {a.timestamp}

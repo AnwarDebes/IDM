@@ -992,8 +992,7 @@ The unified API and comparison engine provide a practical means to evaluate thes
 
 The streaming layer shows how Kafka and ksqlDB can extend a batch-oriented warehouse with event processing. The four-stage ksqlDB pipeline (ingest, validate, aggregate, alert) runs as persistent queries that process events as they arrive, providing continuous monitoring without polling.
 
-Possible extensions include re-measuring MongoDB and Neo4j on the real Project Tycho Level 1 data once a production Docker environment with network access to the Confluent and MongoDB image registries is available, adding time-series database backends (for example TimescaleDB, InfluxDB) for additional comparison, implementing incremental ETL loads rather than full refreshes, and adding more graph-specific analyses that exploit Neo4j's traversal strengths on the city-to-state hierarchy.
-
+Possible extensions include adding time-series database backends (for example TimescaleDB, InfluxDB) for additional comparison against the three systems already benchmarked, implementing incremental ETL loads rather than full refreshes, extending the graph model with richer geographic and demographic relationships to enable additional graph-specific analyses beyond Q11--Q13, and scaling the measurement protocol to larger synthetic loads in order to characterise how the relative performance of PostgreSQL, MongoDB, and Neo4j evolves beyond the 473{,}189-row working set.
 
 % ================================================================
 % REFERENCES
@@ -1900,7 +1899,8 @@ Q13 & Disease centrality (fraction of state-year combinations affected)         
 The full source code for this project is available at:
 \url{https://github.com/AnwarDebes/IDM.git}
 
-
+The deployed web application is available at:
+\url{https://idm-one.vercel.app/}
 
 
 \end{document}

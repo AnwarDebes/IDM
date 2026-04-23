@@ -37,7 +37,7 @@ export default function Graph() {
     <div>
       <h2 style={{ fontSize: '22px', fontWeight: 700, marginBottom: '4px' }}>Graph Explorer</h2>
       <p style={{ color: colors.textMuted, fontSize: '14px', marginBottom: '24px' }}>
-        Neo4j-exclusive graph analytics — border spread, state similarity, disease centrality
+        Neo4j-exclusive graph analytics border spread, state similarity, disease centrality
       </p>
 
       <div style={{ ...layout.card, display: 'flex', gap: '12px', alignItems: 'flex-end', flexWrap: 'wrap' }}>
