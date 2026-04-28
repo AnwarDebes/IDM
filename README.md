@@ -489,50 +489,231 @@ curl -X POST http://localhost:8000/api/v1/compare \
 
 ## Frontend Dashboard
 
-The React dashboard provides five pages for interacting with the data warehouse:
+The React dashboard provides four pages for interacting with the data warehouse: an Overview health page, an OLAP Explorer that runs queries on any single backend, a Comparison Dashboard that runs the same query across all three backends, and a Live Stream monitor for real-time Kafka events.
 
 ### 1. Overview (`/`)
 
-System health dashboard showing:
-- Backend connectivity status (PostgreSQL, MongoDB, Neo4j, Kafka)
-- Row/document/node counts across all backends
-- Disease distribution (bar chart + pie chart)
-- Cases by decade (line chart)
+The landing page is a system health dashboard. It shows backend connectivity (PostgreSQL, MongoDB, Neo4j, Kafka), row, document, and node counts across all three backends, a horizontal bar chart of total cases by disease, a line chart of cases by decade, and a pie chart breakdown of disease distribution.
+
+![Overview dashboard with backend counts, disease bars, decade trend, and distribution pie](docs/screenshots/Screenshot%202026-04-28%20113629.png)
+
+The four large cards confirm the load: 473,189 PostgreSQL fact rows, 155,063 MongoDB bucket documents, 619,646 Neo4j nodes, and 8 diseases tracked from 1916 to 2011. The cases-by-decade curve shows the classic mid-century surge and post-vaccine collapse, while the donut on the right reveals that Measles alone accounts for 75 percent of all cases in the warehouse.
 
 ### 2. OLAP Explorer (`/explorer`)
 
-Interactive query execution interface:
-- Select any of the 13 queries from a dropdown
-- Choose the target backend (PostgreSQL, MongoDB, or Neo4j)
-- Configure query parameters (disease, year range, etc.)
-- View results as auto-generated charts and sortable data tables
-- Inspect the actual SQL / aggregation pipeline / Cypher query
+The OLAP Explorer is the workhorse page. The user picks a backend tab (Postgres, Mongodb, Neo4j), selects one of the 13 queries from the dropdown, optionally fills in parameters (disease, year, year range, threshold), and clicks Execute. The page then renders the raw query, an auto-generated chart, and a sortable result table, along with the row count and execution time.
+
+#### PostgreSQL backend
+
+The relational backend uses the star schema with materialized view fallbacks. Queries Q1 to Q10 below were executed against the `Postgres` tab.
+
+![Postgres Q1: total cases by disease and decade with SQL, bar chart, and result grid](docs/screenshots/Screenshot%202026-04-28%20113840.png)
+
+**Q1 Total cases by disease and decade.** A pure roll-up that aggregates the weekly fact table up to the (disease, decade) grain. Postgres returns 42 rows in 253ms and the chart shows Measles dominating from 1920 onward.
+
+![Postgres Q2: Measles incidence by state for 1960](docs/screenshots/Screenshot%202026-04-28%20113859.png)
+
+**Q2 Measles incidence by state for a specific year.** A slice on `disease=MEASLES` and `year=1960` showing all 50 states ranked by total cases. Texas, New York, and Wisconsin lead the 1960 outbreak, with the query finishing in just under 18ms.
+
+![Postgres Q3: top 10 states by Measles cases between 1950 and 1970](docs/screenshots/Screenshot%202026-04-28%20113944.png)
+
+**Q3 Top 10 states by total cases for disease and time range.** A dice operation on `disease=MEASLES` and `year between 1950 and 1970`, ranked descending. Texas tops the list with 792,930 cases over the two decades.
+
+![Postgres Q4: Measles seasonal pattern as a sinusoidal curve](docs/screenshots/Screenshot%202026-04-28%20114013.png)
+
+**Q4 Seasonal pattern, average weekly cases per month.** A roll-up plus aggregation that produces a clean sinusoidal curve, peaking in March and April and bottoming out in September. This is the canonical respiratory disease seasonality signal.
+
+![Postgres Q5: year over year percentage change in Measles incidence by state](docs/screenshots/Screenshot%202026-04-28%20114059.png)
+
+**Q5 Year over year change in incidence by state.** A window function (`LAG`) over (state, year) that emits 3,257 rows of YoY percentage deltas. The Alabama slice shown swings between minus 96 percent and plus 2,132 percent across the early reporting era.
+
+![Postgres Q6: disease co-occurrence and correlation across state-years](docs/screenshots/Screenshot%202026-04-28%20114300.png)
+
+**Q6 Disease co-occurrence by state and time.** Pairs every disease with every other disease and computes a Pearson correlation across shared state-year totals. Mumps and Rubella correlate at 0.641, the strongest co-spike pair in the warehouse.
+
+![Postgres Q7: chronological ranking of states by first Measles report](docs/screenshots/Screenshot%202026-04-28%20114312.png)
+
+**Q7 Geographic spread rank, states by first report.** Drill-down query that returns each state's first reporting year for a disease and ranks them chronologically. For Measles, every state had its first report in 1928, the year Tycho Level 1 reporting begins.
+
+![Postgres Q8: pre versus post vaccine annual cases per disease](docs/screenshots/Screenshot%202026-04-28%20114321.png)
+
+**Q8 Vaccination impact, before and after comparison.** Slice plus aggregation that compares average annual cases ten years before and ten years after vaccine introduction. Polio shows the steepest decline at minus 87 percent, followed by Measles at minus 77 percent.
+
+![Postgres Q9: anomaly detection flagging state years above two standard deviations](docs/screenshots/Screenshot%202026-04-28%20114338.png)
+
+**Q9 Anomaly detection, state-years above two standard deviations.** Statistical query that computes per-(disease, year) national mean and stddev and flags state totals with z-score greater than 2. New York's 2010 Hepatitis A outbreak tops the list with z = 6.68.
+
+![Postgres Q10: each disease's annual cases as a percentage of its historical peak](docs/screenshots/Screenshot%202026-04-28%20114348.png)
+
+**Q10 Cross disease normalized trend comparison.** Pivot plus normalization that expresses each disease's annual cases as a percentage of its all-time peak. This puts Measles, Polio, and Hepatitis A on the same 0 to 100 scale so their epidemic curves can be visually compared.
+
+#### MongoDB backend
+
+The same 10 queries above are also implemented as MongoDB aggregation pipelines that exploit the bucket documents and pre-aggregated summary collections.
+
+![MongoDB Q1: total cases by disease and decade aggregation pipeline](docs/screenshots/Screenshot%202026-04-28%20114450.png)
+
+**Q1 on MongoDB.** A `$group` over `disease.name` and `time_bucket.decade` against the bucket collection, sorted by disease name. 46 rows returned in 125ms, showing the same decade trend as Postgres but produced from the document store.
+
+![MongoDB Q2: Measles incidence by state for 1960](docs/screenshots/Screenshot%202026-04-28%20114501.png)
+
+**Q2 on MongoDB.** A `$match` on `disease.name` and `time_bucket.year`, then a `$group` by `location.state_name`. Bucket layout makes this a sub-6ms query, far faster than the Postgres equivalent for this slice.
+
+![MongoDB Q3: top 10 states by Measles cases](docs/screenshots/Screenshot%202026-04-28%20114513.png)
+
+**Q3 on MongoDB.** Adds a `$gte` and `$lte` range filter on `time_bucket.year`, sums monthly totals, then sorts and limits to 10. Same Texas at the top, finished in 22ms.
+
+![MongoDB Q4: Measles seasonal pattern with $unwind on weekly observations](docs/screenshots/Screenshot%202026-04-28%20114522.png)
+
+**Q4 on MongoDB.** Uses `$unwind` on the `weekly_observations` array to drop down to the week grain, then averages by `time_bucket.month`. The same March / April peak emerges from the bucket pattern.
+
+![MongoDB Q5: year over year change using $setWindowFields](docs/screenshots/Screenshot%202026-04-28%20114532.png)
+
+**Q5 on MongoDB.** Uses `$setWindowFields` to compute the previous year's total per state, then projects the YoY percent change. 3,257 rows in 290ms, matching the Postgres result row for row.
+
+![MongoDB Q6: disease co-occurrence ranked by joint state-year count](docs/screenshots/Screenshot%202026-04-28%20114544.png)
+
+**Q6 on MongoDB.** Aggregates per (state, year, disease), then groups within state-year to count disease pairs. The MongoDB version returns 8 rows of per-disease totals rather than the 15 pair correlations Postgres produces, illustrating where the relational and document approaches differ.
+
+![MongoDB Q7: first report year per state for Measles](docs/screenshots/Screenshot%202026-04-28%20114552.png)
+
+**Q7 on MongoDB.** A `$match` on disease name plus a `$group` taking `$min` of `time_bucket.year`, sorted ascending. Same 51 jurisdictions, all with first-report year 1928.
+
+![MongoDB Q8: vaccination before and after comparison](docs/screenshots/Screenshot%202026-04-28%20114601.png)
+
+**Q8 on MongoDB.** Multiple aggregations per disease combine pre- and post-vaccine windows. The bar chart again has Measles dominating, with Polio showing the largest relative decline.
+
+![MongoDB Q9: anomaly detection over state totals](docs/screenshots/Screenshot%202026-04-28%20114612.png)
+
+**Q9 on MongoDB.** A two-stage pipeline that first computes per-(disease, year) state totals, then a second `$group` collects each year's distribution and `$push`es it for stddev computation downstream. Same 50 outliers as Postgres.
+
+![MongoDB Q10: cross-disease normalized trend](docs/screenshots/Screenshot%202026-04-28%20114628.png)
+
+**Q10 on MongoDB.** Sums monthly totals into yearly, finds each disease's max, then normalizes. 347 rows in 112ms, slightly more than Postgres because MongoDB returns the early Diphtheria years that Postgres prunes via materialized views.
+
+#### Neo4j backend
+
+Neo4j implements all 10 cross-backend queries plus 3 graph-exclusive queries. Cypher leverages the `MonthlyAggregate` nodes and the `(:State)-[:BORDERS]->(:State)` relationships.
+
+![Neo4j Q1: Cypher MATCH against MonthlyAggregate yields decade roll-up](docs/screenshots/Screenshot%202026-04-28%20114650.png)
+
+**Q1 on Neo4j.** A `MATCH` traversal from `MonthlyAggregate` through `SUMMARIZES_DISEASE` and `IN_DECADE`, summing `total_cases`. Same 46 rows but takes 3.8 seconds because graph traversal is heavier than star-join aggregation.
+
+![Neo4j Q2: Measles state slice via parameterized Cypher](docs/screenshots/Screenshot%202026-04-28%20114708.png)
+
+**Q2 on Neo4j.** Parameterized MATCH on `Disease {name: 'MEASLES'}` and `Year {year: $year}`. 712ms, with results identical to the relational and document backends.
+
+![Neo4j Q3: Top 10 states for Measles 1950 to 1970](docs/screenshots/Screenshot%202026-04-28%20114719.png)
+
+**Q3 on Neo4j.** Adds a `WHERE y.year >= $startYear AND y.year <= $endYear` clause and `LIMIT 10`. Returns Texas through Massachusetts in the same order, in 922ms.
+
+![Neo4j Q4: seasonal pattern from MonthlyAggregate observation counts](docs/screenshots/Screenshot%202026-04-28%20114729.png)
+
+**Q4 on Neo4j.** Walks `MonthlyAggregate` to `Month` and divides total cases by observation count, smoothing into the same sinusoidal seasonality curve.
+
+![Neo4j Q5: YoY using COLLECT and UNWIND with positional indexing](docs/screenshots/Screenshot%202026-04-28%20114740.png)
+
+**Q5 on Neo4j.** Uses `COLLECT` to gather yearly totals per state, `UNWIND RANGE` to walk the array with positional indexing, then computes the YoY percent change. 3,206 rows in 2.7 seconds, the slowest cross-backend Q5 by a wide margin.
+
+![Neo4j Q6: pairwise disease co-occurrence via UNWIND of disease lists](docs/screenshots/Screenshot%202026-04-28%20114751.png)
+
+**Q6 on Neo4j.** Collects diseases per (state, year), filters to states with two or more co-occurring diseases, then double-`UNWIND`s and counts pairs. Returns 19 ordered pairs versus the 15 unordered pairs Postgres returns.
+
+![Neo4j Q7: first report year per state, ranked chronologically](docs/screenshots/Screenshot%202026-04-28%20114806.png)
+
+**Q7 on Neo4j.** `MIN(y.year)` per `State` for the chosen disease, ordered ascending. Same 51 jurisdictions, all 1928, in 444ms.
+
+![Neo4j Q8: vaccination impact via two CALL subqueries](docs/screenshots/Screenshot%202026-04-28%20114818.png)
+
+**Q8 on Neo4j.** Two `CALL` subqueries compute pre- and post-vaccine yearly averages per disease, then the outer query computes percent change. Same 7 vaccine-preventable diseases ranked by impact.
+
+![Neo4j Q9: z-score anomaly detection in Cypher](docs/screenshots/Screenshot%202026-04-28%20114829.png)
+
+**Q9 on Neo4j.** Computes per-(disease, year) state totals into a list, then `UNWIND`s and filters by z-score. Top outlier is again New York Hepatitis A 2010 with z = 6.75.
+
+![Neo4j Q10: normalized trend comparison via inner CASE](docs/screenshots/Screenshot%202026-04-28%20114839.png)
+
+**Q10 on Neo4j.** Computes the per-disease maximum, then normalizes each (disease, year) total, with a `CASE` guard to avoid divide by zero. 347 rows, matching MongoDB.
+
+##### Graph-exclusive queries (Q11 to Q13)
+
+These three queries exploit the `BORDERS` relationship and graph patterns that have no clean SQL or aggregation-pipeline equivalent.
+
+![Neo4j Q11: border spread analysis showing lag months between adjacent states](docs/screenshots/Screenshot%202026-04-28%20115105.png)
+
+**Q11 Disease spread by state borders.** Joins `(s1:State)-[:BORDERS]->(s2:State)` with `MonthlyAggregate` on both sides and finds month pairs where the destination's outbreak follows the origin's by 1 to 6 months. The chart shows neighboring-state spread chains for Measles. The query takes 135 seconds, by far the heaviest in the system, because it walks every border edge against every monthly aggregate.
+
+![Neo4j Q12: each state's disease composition profile as percentages](docs/screenshots/Screenshot%202026-04-28%20115120.png)
+
+**Q12 State similarity by disease profile.** For each state, builds a profile of `{disease, pct}` showing what share of that state's caseload each disease represents. The result table shows all 51 states with their disease composition fingerprints in 1.1 seconds.
+
+![Neo4j Q13: disease centrality measured by coverage across state-years](docs/screenshots/Screenshot%202026-04-28%20115145.png)
+
+**Q13 Disease centrality and coverage.** Counts the number of distinct (state, year) combinations each disease appears in, then divides by the total possible (50 jurisdictions times 81 reporting years) to compute coverage percentage. Measles tops out at 51 percent coverage, Smallpox at the bottom with 3.78 percent.
 
 ### 3. Comparison Dashboard (`/compare`)
 
-Side-by-side backend performance comparison:
-- Run a single query across all backends simultaneously
-- "Run All Q1-Q10" button for full benchmark
-- Execution time bar chart comparing PostgreSQL vs MongoDB vs Neo4j
-- Per-backend result tables with row counts
-- Cumulative timing chart across all queries
+The Comparison page runs the same logical query against all three backends concurrently and lays the result panels side by side, with execution times displayed in green. A second chart at the bottom shows cumulative timings across every query the user has run, making it easy to spot where each backend wins.
+
+![Compare dashboard for Q1 with PostgreSQL at 128ms, MongoDB at 248ms, Neo4j at 389ms](docs/screenshots/Screenshot%202026-04-28%20115229.png)
+
+**Q1 across all backends.** First Compare run of the session. PostgreSQL finishes the decade roll-up in 128ms, MongoDB takes 248ms, Neo4j takes 389ms. All three return the same 42 to 46 rows of (disease, decade) totals.
+
+![Compare dashboard for Q2 with cumulative chart](docs/screenshots/Screenshot%202026-04-28%20115241.png)
+
+**Q2 across all backends.** State slice for Measles in 1960. The cumulative chart at the bottom now includes both Q1 and Q2 bars per backend, making it clear that Neo4j is consistently the slowest of the three on simple slices.
+
+![Compare dashboard for Q3 with cumulative chart growing](docs/screenshots/Screenshot%202026-04-28%20115251.png)
+
+**Q3 across all backends.** Top 10 states by total cases for the chosen disease and year range. PostgreSQL at 50ms, MongoDB at 30ms, Neo4j at 100ms. MongoDB beats Postgres here because the bucket pattern can satisfy the range entirely from one decade's worth of buckets.
+
+![Compare dashboard for Q4 seasonal pattern](docs/screenshots/Screenshot%202026-04-28%20115302.png)
+
+**Q4 across all backends.** Seasonal pattern. PostgreSQL hits 242ms, Neo4j 402ms, MongoDB the slowest at 838ms because `$unwind` on the weekly observations array is expensive.
+
+![Compare dashboard for Q5 year over year](docs/screenshots/Screenshot%202026-04-28%20115313.png)
+
+**Q5 across all backends.** Year over year change. Postgres window functions outperform Neo4j's `COLLECT`/`UNWIND` walk by roughly 3x (377ms versus 1,178ms), with MongoDB's `$setWindowFields` close behind Postgres at 416ms.
+
+![Compare dashboard for Q6 disease co-occurrence](docs/screenshots/Screenshot%202026-04-28%20115324.png)
+
+**Q6 across all backends.** Disease co-occurrence. Roughly even at around 600ms for Postgres and MongoDB, with Neo4j taking 1 second. The cumulative chart starts to show consistent backend ordering across query types.
+
+![Compare dashboard for Q7 geographic spread rank](docs/screenshots/Screenshot%202026-04-28%20115337.png)
+
+**Q7 across all backends.** Geographic spread rank by first reported year. PostgreSQL 194ms, MongoDB 154ms, Neo4j 515ms.
+
+![Compare dashboard for Q8 vaccination impact](docs/screenshots/Screenshot%202026-04-28%20115347.png)
+
+**Q8 across all backends.** Vaccination impact comparison. The expensive `LATERAL` join in Postgres still beats the multi-CALL pattern in Neo4j, at 852ms versus 1,661ms, with MongoDB at 1,076ms.
+
+![Compare dashboard for Q9 anomaly detection](docs/screenshots/Screenshot%202026-04-28%20115359.png)
+
+**Q9 across all backends.** Anomaly detection (z-score above 2). All three exceed 1.5 seconds, the slowest cross-backend query in the suite. MongoDB wins this one at 1,660ms, helped by the pre-aggregated monthly summary collection.
+
+![Compare dashboard for Q10 normalized trend comparison](docs/screenshots/Screenshot%202026-04-28%20115409.png)
+
+**Q10 across all backends.** Pivot plus normalization. PostgreSQL 139ms, MongoDB 176ms, Neo4j 306ms. The cumulative chart now spans 10 query rows, providing a complete cross-backend benchmark snapshot.
+
+![Compare dashboard for Q11 border spread, Neo4j only at 126 seconds](docs/screenshots/Screenshot%202026-04-28%20115629.png)
+
+**Q11 graph-exclusive.** Border spread analysis runs only on Neo4j and dominates the cumulative chart at 126 seconds. PostgreSQL and MongoDB show no bar because no equivalent implementation exists.
+
+![Compare dashboard for Q12 state similarity, Neo4j only](docs/screenshots/Screenshot%202026-04-28%20115640.png)
+
+**Q12 graph-exclusive.** State disease profile similarity. Neo4j returns 51 state profiles in 304ms, with no counterpart on the relational or document backends.
+
+![Compare dashboard for Q13 disease centrality, Neo4j only](docs/screenshots/Screenshot%202026-04-28%20115651.png)
+
+**Q13 graph-exclusive.** Disease centrality and coverage. Neo4j computes 8 disease coverage percentages in 845ms, completing the graph-exclusive trio.
 
 ### 4. Live Stream (`/stream`)
 
-Real-time event monitoring via Server-Sent Events (SSE):
-- Connect/disconnect to the Kafka event stream
-- "Stream Sample Data" button starts the Kafka producer from the backend
-- Live events-per-second chart
-- Anomaly alert panel (flags events with incidence rate > 50)
-- Scrolling event table with disease, state, week, cases, and rate
+The Live Stream page subscribes to the FastAPI Server-Sent Events endpoint, which itself consumes the Kafka `raw-disease-events` topic. The page exposes Connect / Disconnect controls and a Stream Sample Data button that triggers `etl/kafka_producer.py` from the backend.
 
-### 5. Graph Explorer (`/graph`)
+![Live Stream Monitor with 500 events received, events per second curve, and recent events table](docs/screenshots/Screenshot%202026-04-28%20115752.png)
 
-Neo4j-exclusive analytics:
-- Q11: Border spread analysis with lag-month distribution chart
-- Q12: State disease profile similarity table with colored percentage tags
-- Q13: Disease centrality and coverage bar chart
-- Raw results table and Cypher query viewer
+The header shows a green Connected badge after 500 events were received during a producer run. The events-per-second curve ramps up to roughly 50 EPS, plateaus, and then tails off as the producer finishes. The Recent Events table streams rows in disease, state, epi week, cases, and incidence rate, while the Anomaly Alerts panel on the right highlights any event with an incidence rate above 50.
 
 ---
 
